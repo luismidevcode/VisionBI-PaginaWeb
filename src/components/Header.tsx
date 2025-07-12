@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { BarChart3, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useState } from "react";
+import visionbiLogo from "@/assets/visionbi-logo.png";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -17,11 +18,12 @@ const Header = () => {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center space-x-2">
-            <div className="p-2 bg-gradient-primary rounded-lg">
-              <BarChart3 className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold text-foreground">DataInsights</span>
+          <div className="flex items-center space-x-3">
+            <img 
+              src={visionbiLogo} 
+              alt="VisionBI Logo" 
+              className="h-8 w-auto"
+            />
           </div>
 
           {/* Desktop Navigation */}

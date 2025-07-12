@@ -12,7 +12,7 @@ const Hero = () => {
             <div className="space-y-4">
               <div className="inline-flex items-center space-x-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium">
                 <TrendingUp className="h-4 w-4" />
-                <span>Transformamos datos en decisiones</span>
+                <span>TECHNOLOGY • DATA ANALYTICS</span>
               </div>
               
               <h1 className="text-4xl md:text-6xl font-bold text-foreground leading-tight">
