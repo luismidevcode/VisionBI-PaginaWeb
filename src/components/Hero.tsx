@@ -65,36 +65,36 @@ const Hero = () => {
               
             </div>
 
-            {/* Static metrics panel */}
-            <div className="absolute top-4 right-4 bg-card/95 backdrop-blur-md border border-border rounded-xl p-4 shadow-lg">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <TrendingUp className="h-4 w-4 text-primary" />
+            {/* Responsive metrics dashboard */}
+            <div className="absolute top-8 right-8 left-8 md:relative md:top-0 md:right-0 md:left-0 bg-card/95 backdrop-blur-md border border-border rounded-2xl p-6 shadow-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="flex flex-col items-center text-center space-y-3 p-4 bg-primary/5 rounded-xl border border-primary/20">
+                  <div className="p-3 bg-primary/10 rounded-full">
+                    <TrendingUp className="h-6 w-6 text-primary" />
                   </div>
                   <div>
+                    <div className="text-3xl font-bold text-primary">+24%</div>
                     <div className="text-sm font-medium text-muted-foreground">Revenue Growth</div>
-                    <div className="text-lg font-bold text-primary">+24%</div>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-secondary-tech/10 rounded-lg">
-                    <BarChart3 className="h-4 w-4 text-secondary-tech" />
+                <div className="flex flex-col items-center text-center space-y-3 p-4 bg-secondary-tech/5 rounded-xl border border-secondary-tech/20">
+                  <div className="p-3 bg-secondary-tech/10 rounded-full">
+                    <BarChart3 className="h-6 w-6 text-secondary-tech" />
                   </div>
                   <div>
+                    <div className="text-3xl font-bold text-secondary-tech">68%</div>
                     <div className="text-sm font-medium text-muted-foreground">Market Share</div>
-                    <div className="text-lg font-bold text-secondary-tech">68%</div>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-accent/10 rounded-lg">
-                    <LineChart className="h-4 w-4 text-accent" />
+                <div className="flex flex-col items-center text-center space-y-3 p-4 bg-accent/5 rounded-xl border border-accent/20">
+                  <div className="p-3 bg-accent/10 rounded-full">
+                    <LineChart className="h-6 w-6 text-accent" />
                   </div>
                   <div>
+                    <div className="text-3xl font-bold text-accent">95%</div>
                     <div className="text-sm font-medium text-muted-foreground">Efficiency</div>
-                    <div className="text-lg font-bold text-accent">95%</div>
                   </div>
                 </div>
               </div>
