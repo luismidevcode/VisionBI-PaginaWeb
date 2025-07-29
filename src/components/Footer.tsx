@@ -147,7 +147,7 @@ const Footer = () => {
           {/* Copyright */}
           <div className="mt-8 pt-8 border-t border-border text-center">
             <p className="text-muted-foreground">
-              © 2024 DataInsights. Todos los derechos reservados.
+              © 2024 Vision BI. Todos los derechos reservados.
             </p>
           </div>
         </div>

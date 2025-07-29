@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
-import visionbiLogo from "@/assets/visionbi-logo.png";
+import visionbiLogo from "@/assets/logo-vision-BI--sin-fondo.png";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -22,7 +22,7 @@ const Header = () => {
             <img 
               src={visionbiLogo} 
               alt="VisionBI Logo" 
-              className="h-8 w-auto"
+              className="h-13 w-auto max-w-[55px]"
             />
           </div>
 

@@ -10,7 +10,7 @@ const Hero = () => {
             <div className="space-y-4">
               <div className="inline-flex items-center space-x-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium">
                 <TrendingUp className="h-4 w-4" />
-                <span>TECHNOLOGY • DATA ANALYTICS</span>
+                <span>TECNOLOGÍA • ANÁLISIS DE DATOS</span>
               </div>
               
               <h1 className="text-4xl md:text-6xl font-bold text-foreground leading-tight">
@@ -56,7 +56,7 @@ const Hero = () => {
           </div>
 
           {/* Visual */}
-          <div className="relative">
+          <div className="relative space-y-6">
             {/* Background decorative elements */}
             <div className="absolute inset-0 bg-gradient-tech opacity-10 rounded-3xl blur-3xl"></div>
             
@@ -65,27 +65,39 @@ const Hero = () => {
               
             </div>
 
-            {/* Floating elements */}
-            <div className="absolute -top-6 -right-6 bg-card border border-border rounded-xl p-3 shadow-xl animate-float backdrop-blur-sm bg-card/90">
-              <BarChart3 className="h-6 w-6 text-primary mb-1" />
-              <div className="text-xs font-medium text-muted-foreground">Revenue Growth</div>
-              <div className="text-lg font-bold text-primary">+24%</div>
-            </div>
-            
-            <div className="absolute -bottom-6 -left-6 bg-card border border-border rounded-xl p-3 shadow-xl animate-float backdrop-blur-sm bg-card/90" style={{
-            animationDelay: '1s'
-          }}>
-              <PieChart className="h-6 w-6 text-secondary-tech mb-1" />
-              <div className="text-xs font-medium text-muted-foreground">Market Share</div>
-              <div className="text-lg font-bold text-secondary-tech">68%</div>
-            </div>
-
-            <div className="absolute top-4 -left-8 bg-card border border-border rounded-xl p-3 shadow-xl animate-float backdrop-blur-sm bg-card/90" style={{
-            animationDelay: '2s'
-          }}>
-              <LineChart className="h-6 w-6 text-accent mb-1" />
-              <div className="text-xs font-medium text-muted-foreground">Efficiency</div>
-              <div className="text-lg font-bold text-accent">95%</div>
+            {/* Metrics dashboard - responsive positioning */}
+            <div className="bg-card/95 backdrop-blur-md border border-border rounded-2xl p-6 shadow-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="flex flex-col items-center text-center space-y-3 p-4 bg-primary/5 rounded-xl border border-primary/20">
+                  <div className="p-3 bg-primary/10 rounded-full">
+                    <TrendingUp className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <div className="text-3xl font-bold text-primary">+24%</div>
+                    <div className="text-sm font-medium text-muted-foreground">Revenue Growth</div>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col items-center text-center space-y-3 p-4 bg-secondary-tech/5 rounded-xl border border-secondary-tech/20">
+                  <div className="p-3 bg-secondary-tech/10 rounded-full">
+                    <BarChart3 className="h-6 w-6 text-secondary-tech" />
+                  </div>
+                  <div>
+                    <div className="text-3xl font-bold text-secondary-tech">68%</div>
+                    <div className="text-sm font-medium text-muted-foreground">Market Share</div>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col items-center text-center space-y-3 p-4 bg-accent/5 rounded-xl border border-accent/20">
+                  <div className="p-3 bg-accent/10 rounded-full">
+                    <LineChart className="h-6 w-6 text-accent" />
+                  </div>
+                  <div>
+                    <div className="text-3xl font-bold text-accent">95%</div>
+                    <div className="text-sm font-medium text-muted-foreground">Efficiency</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
