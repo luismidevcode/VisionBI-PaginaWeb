@@ -65,40 +65,40 @@ const Hero = () => {
               
             </div>
 
-            {/* Floating metrics badges */}
-            <div className="absolute top-8 right-4 flex flex-col gap-3 animate-fade-in">
-              <div className="bg-gradient-primary/20 backdrop-blur-md border border-primary/30 rounded-full px-4 py-2 flex items-center gap-2 animate-float">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <span className="text-sm font-semibold text-primary">+24% Revenue</span>
-              </div>
-              
-              <div className="bg-secondary-tech/20 backdrop-blur-md border border-secondary-tech/30 rounded-full px-4 py-2 flex items-center gap-2 animate-float" style={{
-                animationDelay: '0.5s'
-              }}>
-                <BarChart3 className="h-4 w-4 text-secondary-tech" />
-                <span className="text-sm font-semibold text-secondary-tech">68% Market</span>
+            {/* Static metrics panel */}
+            <div className="absolute top-4 right-4 bg-card/95 backdrop-blur-md border border-border rounded-xl p-4 shadow-lg">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Revenue Growth</div>
+                    <div className="text-lg font-bold text-primary">+24%</div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-secondary-tech/10 rounded-lg">
+                    <BarChart3 className="h-4 w-4 text-secondary-tech" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Market Share</div>
+                    <div className="text-lg font-bold text-secondary-tech">68%</div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-accent/10 rounded-lg">
+                    <LineChart className="h-4 w-4 text-accent" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Efficiency</div>
+                    <div className="text-lg font-bold text-accent">95%</div>
+                  </div>
+                </div>
               </div>
             </div>
-
-            <div className="absolute bottom-8 left-4 animate-fade-in" style={{
-              animationDelay: '1s'
-            }}>
-              <div className="bg-accent/20 backdrop-blur-md border border-accent/30 rounded-full px-4 py-2 flex items-center gap-2 animate-float" style={{
-                animationDelay: '1.5s'
-              }}>
-                <LineChart className="h-4 w-4 text-accent" />
-                <span className="text-sm font-semibold text-accent">95% Efficiency</span>
-              </div>
-            </div>
-
-            {/* Decorative particles */}
-            <div className="absolute top-1/4 right-1/4 w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-            <div className="absolute bottom-1/3 right-1/3 w-1 h-1 bg-secondary-tech rounded-full animate-pulse" style={{
-              animationDelay: '2s'
-            }}></div>
-            <div className="absolute top-1/2 left-1/4 w-1.5 h-1.5 bg-accent rounded-full animate-pulse" style={{
-              animationDelay: '1s'
-            }}></div>
           </div>
         </div>
       </div>
