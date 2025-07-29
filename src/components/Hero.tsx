@@ -1,10 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { TrendingUp, ArrowRight, BarChart3, PieChart, LineChart } from "lucide-react";
 import heroImage from "@/assets/hero-bi.jpg";
-
 const Hero = () => {
-  return (
-    <section className="min-h-screen flex items-center justify-center bg-gradient-hero pt-20">
+  return <section className="min-h-screen flex items-center justify-center bg-gradient-hero pt-20">
       <div className="container mx-auto px-4 py-20">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Content */}
@@ -64,11 +62,7 @@ const Hero = () => {
             
             {/* Main image */}
             <div className="relative z-10 rounded-2xl overflow-hidden shadow-2xl">
-              <img 
-                src={heroImage} 
-                alt="Business Intelligence Dashboard" 
-                className="w-full h-auto"
-              />
+              
             </div>
 
             {/* Floating elements */}
@@ -78,13 +72,17 @@ const Hero = () => {
               <div className="text-2xl font-bold text-primary">+24%</div>
             </div>
             
-            <div className="absolute -bottom-4 -left-4 bg-card border border-border rounded-lg p-4 shadow-lg animate-float" style={{ animationDelay: '1s' }}>
+            <div className="absolute -bottom-4 -left-4 bg-card border border-border rounded-lg p-4 shadow-lg animate-float" style={{
+            animationDelay: '1s'
+          }}>
               <PieChart className="h-8 w-8 text-secondary-tech mb-2" />
               <div className="text-sm font-medium">Market Share</div>
               <div className="text-2xl font-bold text-secondary-tech">68%</div>
             </div>
 
-            <div className="absolute top-1/2 -right-8 bg-card border border-border rounded-lg p-4 shadow-lg animate-float" style={{ animationDelay: '2s' }}>
+            <div className="absolute top-1/2 -right-8 bg-card border border-border rounded-lg p-4 shadow-lg animate-float" style={{
+            animationDelay: '2s'
+          }}>
               <LineChart className="h-8 w-8 text-accent mb-2" />
               <div className="text-sm font-medium">Efficiency</div>
               <div className="text-2xl font-bold text-accent">95%</div>
@@ -92,8 +90,6 @@ const Hero = () => {
           </div>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
-
 export default Hero;
