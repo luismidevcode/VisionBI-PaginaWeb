@@ -66,26 +66,26 @@ const Hero = () => {
             </div>
 
             {/* Floating elements */}
-            <div className="absolute -top-4 -right-4 bg-card border border-border rounded-lg p-4 shadow-lg animate-float">
-              <BarChart3 className="h-8 w-8 text-primary mb-2" />
-              <div className="text-sm font-medium">Revenue Growth</div>
-              <div className="text-2xl font-bold text-primary">+24%</div>
+            <div className="absolute -top-6 -right-6 bg-card border border-border rounded-xl p-3 shadow-xl animate-float backdrop-blur-sm bg-card/90">
+              <BarChart3 className="h-6 w-6 text-primary mb-1" />
+              <div className="text-xs font-medium text-muted-foreground">Revenue Growth</div>
+              <div className="text-lg font-bold text-primary">+24%</div>
             </div>
             
-            <div className="absolute -bottom-4 -left-4 bg-card border border-border rounded-lg p-4 shadow-lg animate-float" style={{
+            <div className="absolute -bottom-6 -left-6 bg-card border border-border rounded-xl p-3 shadow-xl animate-float backdrop-blur-sm bg-card/90" style={{
             animationDelay: '1s'
           }}>
-              <PieChart className="h-8 w-8 text-secondary-tech mb-2" />
-              <div className="text-sm font-medium">Market Share</div>
-              <div className="text-2xl font-bold text-secondary-tech">68%</div>
+              <PieChart className="h-6 w-6 text-secondary-tech mb-1" />
+              <div className="text-xs font-medium text-muted-foreground">Market Share</div>
+              <div className="text-lg font-bold text-secondary-tech">68%</div>
             </div>
 
-            <div className="absolute top-1/2 -right-8 bg-card border border-border rounded-lg p-4 shadow-lg animate-float" style={{
+            <div className="absolute top-4 -left-8 bg-card border border-border rounded-xl p-3 shadow-xl animate-float backdrop-blur-sm bg-card/90" style={{
             animationDelay: '2s'
           }}>
-              <LineChart className="h-8 w-8 text-accent mb-2" />
-              <div className="text-sm font-medium">Efficiency</div>
-              <div className="text-2xl font-bold text-accent">95%</div>
+              <LineChart className="h-6 w-6 text-accent mb-1" />
+              <div className="text-xs font-medium text-muted-foreground">Efficiency</div>
+              <div className="text-lg font-bold text-accent">95%</div>
             </div>
           </div>
         </div>
