@@ -56,7 +56,7 @@ const Hero = () => {
           </div>
 
           {/* Visual */}
-          <div className="relative">
+          <div className="relative space-y-6">
             {/* Background decorative elements */}
             <div className="absolute inset-0 bg-gradient-tech opacity-10 rounded-3xl blur-3xl"></div>
             
@@ -65,8 +65,8 @@ const Hero = () => {
               
             </div>
 
-            {/* Responsive metrics dashboard */}
-            <div className="absolute top-8 right-8 left-8 md:relative md:top-0 md:right-0 md:left-0 bg-card/95 backdrop-blur-md border border-border rounded-2xl p-6 shadow-xl">
+            {/* Metrics dashboard - responsive positioning */}
+            <div className="bg-card/95 backdrop-blur-md border border-border rounded-2xl p-6 shadow-xl">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <div className="flex flex-col items-center text-center space-y-3 p-4 bg-primary/5 rounded-xl border border-primary/20">
                   <div className="p-3 bg-primary/10 rounded-full">
