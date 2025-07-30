@@ -64,7 +64,7 @@ const Footer = () => {
                 <div className="p-2 bg-gradient-primary rounded-lg">
                   <BarChart3 className="h-6 w-6 text-primary-foreground" />
                 </div>
-                <span className="text-xl font-bold text-foreground">DataInsights</span>
+                <span className="text-xl font-bold text-foreground">VisionBI</span>
               </div>
               
               <p className="text-muted-foreground max-w-md">
@@ -76,15 +76,11 @@ const Footer = () => {
               <div className="space-y-3">
                 <div className="flex items-center space-x-3">
                   <Mail className="h-5 w-5 text-primary" />
-                  <span className="text-muted-foreground">contacto@datainsights.com</span>
+                  <span className="text-muted-foreground">info.visionbi@gmail.com</span>
                 </div>
                 <div className="flex items-center space-x-3">
                   <Phone className="h-5 w-5 text-primary" />
                   <span className="text-muted-foreground">+1 (555) 123-4567</span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <MapPin className="h-5 w-5 text-primary" />
-                  <span className="text-muted-foreground">123 Business Ave, Suite 100</span>
                 </div>
               </div>
 
