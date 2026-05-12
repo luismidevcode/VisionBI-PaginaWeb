@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ChevronLeft,
   AlertCircle,
+  Video,
 } from "lucide-react";
 
 import {
@@ -40,7 +41,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+// ─── Constantes ───────────────────────────────────────────────────────────────
 
 const MEETING_TYPES = [
   "Diagnóstico Gratis",
@@ -49,33 +50,46 @@ const MEETING_TYPES = [
   "Seguimiento",
 ];
 
+const COLABORADORES_OPTIONS = [
+  "1 – 10",
+  "11 – 50",
+  "51 – 200",
+  "201 – 500",
+  "Más de 500",
+];
+
+const MIN_DAYS_AHEAD = 7;
+
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
 interface Slot {
   start: string;
   end:   string;
 }
 
 interface ConfirmedBooking {
-  date:   string;
-  time:   string;
-  correo: string;
+  date:     string;
+  time:     string;
+  correo:   string;
+  meetLink: string;
 }
 
 // ─── Validación ───────────────────────────────────────────────────────────────
 
 const formSchema = z.object({
-  tipo_encuentro: z.string().min(1, "Selecciona un tipo de encuentro"),
-  empresa:        z.string().min(2, "Ingresa el nombre de tu empresa"),
-  nit_cedula:     z.string().min(5, "Ingresa un NIT o cédula válido"),
-  correo:         z.string().email("Ingresa un correo electrónico válido"),
-  telefono:       z.string().min(7, "Ingresa un teléfono válido"),
-  motivo:         z.string().min(10, "Describe brevemente el motivo del encuentro"),
+  tipo_encuentro:    z.string().min(1, "Selecciona un tipo de encuentro"),
+  empresa:           z.string().min(2, "Ingresa el nombre de tu empresa"),
+  num_colaboradores: z.string().min(1, "Selecciona el número de colaboradores"),
+  nit_cedula:        z.string().min(5, "Ingresa un NIT o cédula válido"),
+  correo:            z.string().email("Ingresa un correo electrónico válido"),
+  telefono:          z.string().min(7, "Ingresa un teléfono válido"),
+  motivo:            z.string().min(10, "Describe brevemente el motivo del encuentro"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Lee la hora directamente del ISO string Bogotá "YYYY-MM-DDTHH:mm:ss-05:00" */
 function formatSlotTime(iso: string): string {
   const hour    = parseInt(iso.substring(11, 13), 10);
   const minutes = iso.substring(14, 16);
@@ -84,10 +98,11 @@ function formatSlotTime(iso: string): string {
   return `${h}:${minutes} ${ampm}`;
 }
 
-function disabledDays(date: Date): boolean {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return date < today || isSaturday(date) || isSunday(date);
+function minBookableDate(): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + MIN_DAYS_AHEAD);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -95,7 +110,7 @@ function disabledDays(date: Date): boolean {
 interface BookingModalProps {
   open:         boolean;
   onClose:      () => void;
-  meetingType?: string; // pre-rellena y bloquea el campo; sin él aparece el desplegable
+  meetingType?: string;
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
@@ -111,24 +126,73 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
   const [submitError,   setSubmitError]   = useState<string | null>(null);
   const [confirmed,     setConfirmed]     = useState<ConfirmedBooking | null>(null);
 
+  // Días disponibles del mes mostrado
+  const [availableDays, setAvailableDays] = useState<Set<string>>(new Set());
+  const [daysLoaded,    setDaysLoaded]    = useState(false);
+  const [displayMonth,  setDisplayMonth]  = useState<Date>(minBookableDate);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      tipo_encuentro: meetingType ?? "",
-      empresa:        "",
-      nit_cedula:     "",
-      correo:         "",
-      telefono:       "",
-      motivo:         "",
+      tipo_encuentro:    meetingType ?? "",
+      empresa:           "",
+      num_colaboradores: "",
+      nit_cedula:        "",
+      correo:            "",
+      telefono:          "",
+      motivo:            "",
     },
   });
 
-  // Sincronizar tipo_encuentro si el prop cambia (distinto botón CTA)
   useEffect(() => {
     if (meetingType) form.setValue("tipo_encuentro", meetingType);
   }, [meetingType, form]);
 
-  // ── Obtener slots ─────────────────────────────────────────────────────────
+  // ── Cargar días disponibles del mes ──────────────────────────────────────
+
+  const fetchAvailableDays = useCallback(async (month: Date) => {
+    setDaysLoaded(false);
+    try {
+      const { data } = await supabase.functions.invoke<{ availableDays: string[] }>(
+        "get-slots",
+        { body: { month: format(month, "yyyy-MM") } }
+      );
+      setAvailableDays(new Set(data?.availableDays ?? []));
+    } catch {
+      setAvailableDays(new Set());
+    } finally {
+      setDaysLoaded(true);
+    }
+  }, []);
+
+  // Al abrir el modal, cargar el mes inicial (el más próximo con días hábiles)
+  useEffect(() => {
+    if (open) {
+      const initial = minBookableDate();
+      setDisplayMonth(initial);
+      fetchAvailableDays(initial);
+    }
+  }, [open, fetchAvailableDays]);
+
+  // ── Función de días deshabilitados ────────────────────────────────────────
+
+  const isDisabled = useCallback((date: Date): boolean => {
+    if (date < minBookableDate() || isSaturday(date) || isSunday(date)) return true;
+    if (daysLoaded) return !availableDays.has(format(date, "yyyy-MM-dd"));
+    return false;
+  }, [availableDays, daysLoaded]);
+
+  // ── Cambio de mes ─────────────────────────────────────────────────────────
+
+  const handleMonthChange = (month: Date) => {
+    setDisplayMonth(month);
+    setSelectedDate(undefined);
+    setSlots([]);
+    setSelectedSlot(null);
+    fetchAvailableDays(month);
+  };
+
+  // ── Obtener slots del día ────────────────────────────────────────────────
 
   const fetchSlots = async (date: Date) => {
     setLoadingSlots(true);
@@ -141,15 +205,10 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
         "get-slots",
         { body: { date: format(date, "yyyy-MM-dd") } }
       );
-      if (error) {
-        console.error("[get-slots] error:", error);
-        throw error;
-      }
-      console.log("[get-slots] respuesta:", data);
+      if (error) throw error;
       setSlots(data?.slots ?? []);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : JSON.stringify(err);
-      console.error("[get-slots] catch:", msg);
       setSlotsError(`Error: ${msg}`);
     } finally {
       setLoadingSlots(false);
@@ -169,7 +228,7 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
     setSubmitError(null);
 
     try {
-      const { error } = await supabase.functions.invoke("book-appointment", {
+      const { data, error } = await supabase.functions.invoke("book-appointment", {
         body: {
           ...values,
           fecha_inicio: selectedSlot.start,
@@ -179,9 +238,10 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
       if (error) throw error;
 
       setConfirmed({
-        date:   format(selectedDate!, "EEEE d 'de' MMMM yyyy", { locale: es }),
-        time:   `${formatSlotTime(selectedSlot.start)} – ${formatSlotTime(selectedSlot.end)}`,
-        correo: values.correo,
+        date:     format(selectedDate!, "EEEE d 'de' MMMM yyyy", { locale: es }),
+        time:     `${formatSlotTime(selectedSlot.start)} – ${formatSlotTime(selectedSlot.end)}`,
+        correo:   values.correo,
+        meetLink: (data as { meet_link?: string })?.meet_link ?? "",
       });
       setStep(3);
     } catch {
@@ -201,7 +261,9 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
     setSlotsError(null);
     setSubmitError(null);
     setConfirmed(null);
-    form.reset({ tipo_encuentro: meetingType ?? "" });
+    setAvailableDays(new Set());
+    setDaysLoaded(false);
+    form.reset({ tipo_encuentro: meetingType ?? "", num_colaboradores: "" });
     onClose();
   };
 
@@ -240,10 +302,18 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
                 mode="single"
                 selected={selectedDate}
                 onSelect={handleDateSelect}
-                disabled={disabledDays}
+                disabled={isDisabled}
+                month={displayMonth}
+                onMonthChange={handleMonthChange}
                 className="rounded-lg border pointer-events-auto"
               />
             </div>
+
+            {!daysLoaded && (
+              <p className="text-xs text-muted-foreground text-center animate-pulse">
+                Cargando disponibilidad…
+              </p>
+            )}
 
             {selectedDate && (
               <div className="space-y-3">
@@ -358,6 +428,30 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
                 )}
               />
 
+              {/* Número de colaboradores */}
+              <FormField
+                control={form.control}
+                name="num_colaboradores"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Número de colaboradores</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona el rango" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {COLABORADORES_OPTIONS.map((opt) => (
+                          <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* NIT / Cédula */}
               <FormField
                 control={form.control}
@@ -422,7 +516,6 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
                 )}
               />
 
-              {/* Error de envío */}
               {submitError && (
                 <div className="flex items-center gap-2 text-destructive text-sm">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
@@ -471,13 +564,42 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
                   <p className="font-semibold">{confirmed.time}</p>
                 </div>
               </div>
+              {confirmed.meetLink && (
+                <div className="flex items-start gap-3">
+                  <Video className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Google Meet</p>
+                    <a
+                      href={confirmed.meetLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-primary hover:underline break-all"
+                    >
+                      {confirmed.meetLink}
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
 
+            {confirmed.meetLink && (
+              <a
+                href={confirmed.meetLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block"
+              >
+                <Button variant="outline" className="w-full gap-2">
+                  <Video className="h-4 w-4" />
+                  Unirse a Google Meet
+                </Button>
+              </a>
+            )}
+
             <p className="text-sm text-muted-foreground text-center leading-relaxed">
-              Enviamos la invitación al calendario y un correo de confirmación a{" "}
+              Enviamos un correo de confirmación con el enlace Meet y la invitación
+              al calendario a{" "}
               <span className="font-medium text-foreground">{confirmed.correo}</span>.
-              <br />
-              Acepta la invitación para que aparezca en tu calendario.
             </p>
 
             <Button onClick={handleClose} variant="gradient" className="w-full">
