@@ -1,43 +1,31 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { BarChart3, Mail, Phone, MapPin, Linkedin, Twitter, Facebook } from "lucide-react";
+import { Input }  from "@/components/ui/input";
+import { Mail, Phone, Linkedin, Twitter, Facebook } from "lucide-react";
+import visionbiLogo from "@/assets/logo-vision-BI--sin-fondo.png";
 
-const Footer = () => {
+interface FooterProps {
+  onOpenBooking: (type?: string) => void;
+}
+
+const Footer = ({ onOpenBooking }: FooterProps) => {
   const footerSections = [
     {
       title: "Servicios",
-      links: [
-        "Análisis de Datos",
-        "Data Warehousing", 
-        "Dashboards Ejecutivos",
-        "Consultoría BI",
-        "Capacitación"
-      ]
+      links: ["Análisis de Datos", "Data Warehousing", "Dashboards Ejecutivos", "Consultoría BI", "Capacitación"],
     },
     {
       title: "Recursos",
-      links: [
-        "Blog",
-        "Casos de Estudio",
-        "Whitepapers",
-        "Webinars",
-        "Centro de Ayuda"
-      ]
+      links: ["Blog", "Casos de Estudio", "Whitepapers", "Webinars", "Centro de Ayuda"],
     },
     {
       title: "Empresa",
-      links: [
-        "Acerca de Nosotros",
-        "Equipo",
-        "Carreras",
-        "Contacto",
-        "Privacidad"
-      ]
-    }
+      links: ["Acerca de Nosotros", "Equipo", "Carreras", "Contacto", "Privacidad"],
+    },
   ];
 
   return (
     <footer id="contacto" className="bg-background border-t border-border">
+
       {/* CTA Section */}
       <div className="bg-gradient-primary py-16">
         <div className="container mx-auto px-4 text-center">
@@ -45,31 +33,35 @@ const Footer = () => {
             ¿Listo para transformar tus datos?
           </h2>
           <p className="text-xl text-primary-foreground/90 mb-8 max-w-2xl mx-auto">
-            Agenda una consulta gratuita y descubre cómo nuestras soluciones 
+            Agenda una consulta gratuita y descubre cómo nuestras soluciones
             pueden impulsar el crecimiento de tu empresa.
           </p>
-          <Button variant="secondary" size="lg" className="bg-white text-primary hover:bg-white/90">
-            Consulta Gratuita
+          <Button
+            variant="secondary"
+            size="lg"
+            className="bg-white text-primary hover:bg-white/90"
+            onClick={() => onOpenBooking("Diagnóstico Gratis")}
+          >
+            Diagnóstico Gratuito
           </Button>
         </div>
       </div>
 
-      {/* Main Footer */}
+      {/* Footer principal */}
       <div className="py-16">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-8">
-            {/* Company Info */}
+
+            {/* Información empresa */}
             <div className="lg:col-span-2 space-y-6">
-              <div className="flex items-center space-x-2">
-                <div className="p-2 bg-gradient-primary rounded-lg">
-                  <BarChart3 className="h-6 w-6 text-primary-foreground" />
-                </div>
+              <div className="flex items-center space-x-3">
+                <img src={visionbiLogo} alt="VisionBI" className="h-10 w-auto" />
                 <span className="text-xl font-bold text-foreground">VisionBI</span>
               </div>
-              
+
               <p className="text-muted-foreground max-w-md">
-                Transformamos datos en decisiones inteligentes. Somos especialistas 
-                en Business Intelligence con más de 10 años de experiencia ayudando 
+                Transformamos datos en decisiones inteligentes. Somos especialistas
+                en Business Intelligence con más de 10 años de experiencia ayudando
                 a empresas a maximizar el valor de sus datos.
               </p>
 
@@ -85,29 +77,20 @@ const Footer = () => {
               </div>
 
               <div className="flex space-x-4">
-                <Button variant="outline" size="icon">
-                  <Linkedin className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="icon">
-                  <Twitter className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="icon">
-                  <Facebook className="h-4 w-4" />
-                </Button>
+                <Button variant="outline" size="icon"><Linkedin className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon"><Twitter  className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon"><Facebook className="h-4 w-4" /></Button>
               </div>
             </div>
 
-            {/* Footer Sections */}
+            {/* Columnas de links */}
             {footerSections.map((section, index) => (
               <div key={index}>
                 <h3 className="font-semibold text-foreground mb-4">{section.title}</h3>
                 <ul className="space-y-3">
-                  {section.links.map((link, linkIndex) => (
-                    <li key={linkIndex}>
-                      <a 
-                        href="#" 
-                        className="text-muted-foreground hover:text-primary transition-colors duration-300"
-                      >
+                  {section.links.map((link, i) => (
+                    <li key={i}>
+                      <a href="#" className="text-muted-foreground hover:text-primary transition-colors duration-300">
                         {link}
                       </a>
                     </li>
@@ -121,21 +104,14 @@ const Footer = () => {
           <div className="mt-12 pt-8 border-t border-border">
             <div className="grid md:grid-cols-2 gap-8 items-center">
               <div>
-                <h3 className="text-xl font-semibold text-foreground mb-2">
-                  Mantente actualizado
-                </h3>
+                <h3 className="text-xl font-semibold text-foreground mb-2">Mantente actualizado</h3>
                 <p className="text-muted-foreground">
                   Recibe las últimas tendencias en Business Intelligence y análisis de datos.
                 </p>
               </div>
               <div className="flex space-x-3">
-                <Input 
-                  placeholder="Tu email" 
-                  className="flex-1"
-                />
-                <Button variant="default">
-                  Suscribirse
-                </Button>
+                <Input placeholder="Tu email" className="flex-1" />
+                <Button variant="default">Suscribirse</Button>
               </div>
             </div>
           </div>
@@ -143,7 +119,7 @@ const Footer = () => {
           {/* Copyright */}
           <div className="mt-8 pt-8 border-t border-border text-center">
             <p className="text-muted-foreground">
-              © 2024 Vision BI. Todos los derechos reservados.
+              © 2025 VisionBI. Todos los derechos reservados.
             </p>
           </div>
         </div>

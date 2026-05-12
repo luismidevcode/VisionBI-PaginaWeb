@@ -1,18 +1,24 @@
 import { Button } from "@/components/ui/button";
-import { TrendingUp, ArrowRight, BarChart3, PieChart, LineChart } from "lucide-react";
-import heroImage from "@/assets/hero-bi.jpg";
-const Hero = () => {
-  return <section className="min-h-screen flex items-center justify-center bg-gradient-hero pt-20">
+import { TrendingUp, ArrowRight, BarChart3, LineChart } from "lucide-react";
+
+interface HeroProps {
+  onOpenBooking: (type?: string) => void;
+}
+
+const Hero = ({ onOpenBooking }: HeroProps) => {
+  return (
+    <section className="min-h-screen flex items-center justify-center bg-gradient-hero pt-20">
       <div className="container mx-auto px-4 py-20">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Content */}
+
+          {/* Contenido */}
           <div className="space-y-8 animate-fade-in">
             <div className="space-y-4">
               <div className="inline-flex items-center space-x-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium">
                 <TrendingUp className="h-4 w-4" />
                 <span>TECNOLOGÍA • ANÁLISIS DE DATOS</span>
               </div>
-              
+
               <h1 className="text-4xl md:text-6xl font-bold text-foreground leading-tight">
                 <span className="bg-gradient-tech bg-clip-text text-transparent">
                   Business Intelligence
@@ -20,20 +26,29 @@ const Hero = () => {
                 <br />
                 que impulsa tu negocio
               </h1>
-              
+
               <p className="text-xl text-muted-foreground max-w-lg">
-                Convierte tus datos en insights accionables con nuestras soluciones 
-                avanzadas de BI. Toma decisiones informadas y acelera el crecimiento 
+                Convierte tus datos en insights accionables con nuestras soluciones
+                avanzadas de BI. Toma decisiones informadas y acelera el crecimiento
                 de tu empresa.
               </p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button variant="gradient" size="lg" className="group">
-                Empezar Ahora
+              <Button
+                variant="gradient"
+                size="lg"
+                className="group"
+                onClick={() => onOpenBooking("Diagnóstico Gratis")}
+              >
+                Diagnóstico Gratis
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </Button>
-              <Button variant="outline" size="lg">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => onOpenBooking("Demo de Producto")}
+              >
                 Ver Demo
               </Button>
             </div>
@@ -57,16 +72,10 @@ const Hero = () => {
 
           {/* Visual */}
           <div className="relative space-y-6">
-            {/* Background decorative elements */}
-            <div className="absolute inset-0 bg-gradient-tech opacity-10 rounded-3xl blur-3xl"></div>
-            
-            {/* Main image */}
-            <div className="relative z-10 rounded-2xl overflow-hidden shadow-2xl">
-              
-            </div>
+            <div className="absolute inset-0 bg-gradient-tech opacity-10 rounded-3xl blur-3xl" />
 
-            {/* Metrics dashboard - responsive positioning */}
-            <div className="bg-card/95 backdrop-blur-md border border-border rounded-2xl p-6 shadow-xl">
+            {/* Dashboard de métricas */}
+            <div className="relative z-10 bg-card/95 backdrop-blur-md border border-border rounded-2xl p-6 shadow-xl">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <div className="flex flex-col items-center text-center space-y-3 p-4 bg-primary/5 rounded-xl border border-primary/20">
                   <div className="p-3 bg-primary/10 rounded-full">
@@ -77,7 +86,7 @@ const Hero = () => {
                     <div className="text-sm font-medium text-muted-foreground">Revenue Growth</div>
                   </div>
                 </div>
-                
+
                 <div className="flex flex-col items-center text-center space-y-3 p-4 bg-secondary-tech/5 rounded-xl border border-secondary-tech/20">
                   <div className="p-3 bg-secondary-tech/10 rounded-full">
                     <BarChart3 className="h-6 w-6 text-secondary-tech" />
@@ -87,7 +96,7 @@ const Hero = () => {
                     <div className="text-sm font-medium text-muted-foreground">Market Share</div>
                   </div>
                 </div>
-                
+
                 <div className="flex flex-col items-center text-center space-y-3 p-4 bg-accent/5 rounded-xl border border-accent/20">
                   <div className="p-3 bg-accent/10 rounded-full">
                     <LineChart className="h-6 w-6 text-accent" />
@@ -102,6 +111,8 @@ const Hero = () => {
           </div>
         </div>
       </div>
-    </section>;
+    </section>
+  );
 };
+
 export default Hero;

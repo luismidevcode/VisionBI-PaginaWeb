@@ -12,6 +12,15 @@ dist
 dist-ssr
 *.local
 
+# Secrets – NUNCA commitear
+*.json
+!package.json
+!tsconfig*.json
+!components.json
+.env
+.env.local
+.env.*.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
