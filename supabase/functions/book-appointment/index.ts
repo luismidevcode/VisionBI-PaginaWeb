@@ -23,15 +23,13 @@ async function getGoogleAccessToken(): Promise<string> {
   const now   = Math.floor(Date.now() / 1000);
 
   const header  = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const payload = base64url(
-    JSON.stringify({
-      iss:   email,
-      scope: "https://www.googleapis.com/auth/calendar",
-      aud:   "https://oauth2.googleapis.com/token",
-      exp:   now + 3600,
-      iat:   now,
-    })
-  );
+  const payload = base64url(JSON.stringify({
+    iss:   email,
+    scope: "https://www.googleapis.com/auth/calendar",
+    aud:   "https://oauth2.googleapis.com/token",
+    exp:   now + 3600,
+    iat:   now,
+  }));
   const signingInput = `${header}.${payload}`;
 
   const pemContent = pem
@@ -41,15 +39,12 @@ async function getGoogleAccessToken(): Promise<string> {
 
   const binaryKey = Uint8Array.from(atob(pemContent), (c) => c.charCodeAt(0));
   const cryptoKey = await crypto.subtle.importKey(
-    "pkcs8",
-    binaryKey,
+    "pkcs8", binaryKey,
     { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"]
+    false, ["sign"]
   );
   const sig = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    cryptoKey,
+    "RSASSA-PKCS1-v1_5", cryptoKey,
     new TextEncoder().encode(signingInput)
   );
 
@@ -68,42 +63,123 @@ async function getGoogleAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-// ─── Email HTML ───────────────────────────────────────────────────────────────
+// ─── ICS (invitación de calendario estándar) ─────────────────────────────────
 
-function buildEmailHtml(
-  empresa:        string,
-  tipo_encuentro: string,
-  correo:         string,
-  dateStr:        string,
-  timeRange:      string
+function generateICS(params: {
+  uid:         string;
+  summary:     string;
+  description: string;
+  startISO:    string;
+  endISO:      string;
+  organizer:   string;
+  attendee:    string;
+}): string {
+  const toUTC = (iso: string) =>
+    new Date(iso).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//VisionBI//Business Intelligence//ES",
+    "CALSCALE:GREGORIAN",
+    "METHOD:REQUEST",
+    "BEGIN:VEVENT",
+    `DTSTART:${toUTC(params.startISO)}`,
+    `DTEND:${toUTC(params.endISO)}`,
+    `DTSTAMP:${toUTC(new Date().toISOString())}`,
+    `UID:${params.uid}@visionbi.co`,
+    `SUMMARY:${params.summary}`,
+    `DESCRIPTION:${params.description.replace(/\n/g, "\\n")}`,
+    `ORGANIZER;CN=VisionBI:mailto:${params.organizer}`,
+    `ATTENDEE;RSVP=TRUE;CN=Cliente:mailto:${params.attendee}`,
+    "STATUS:CONFIRMED",
+    "SEQUENCE:0",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ];
+  return lines.join("\r\n");
+}
+
+function icsToBase64(ics: string): string {
+  const bytes = new TextEncoder().encode(ics);
+  return btoa(String.fromCharCode(...bytes));
+}
+
+// ─── Email cliente ────────────────────────────────────────────────────────────
+
+function buildClientEmailHtml(
+  empresa: string, tipo_encuentro: string,
+  dateStr: string, timeRange: string
 ): string {
   return `
-    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
-      <div style="background:linear-gradient(135deg,#3b82f6,#8b5cf6);padding:32px;text-align:center">
-        <h1 style="color:#fff;margin:0;font-size:24px">¡Tu cita está confirmada!</h1>
-        <p style="color:rgba(255,255,255,0.85);margin:8px 0 0">VisionBI – Business Intelligence</p>
+  <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
+    <div style="background:linear-gradient(135deg,#3b82f6,#8b5cf6);padding:32px;text-align:center">
+      <h1 style="color:#fff;margin:0;font-size:24px">¡Tu cita está confirmada!</h1>
+      <p style="color:rgba(255,255,255,0.85);margin:8px 0 0">VisionBI – Business Intelligence</p>
+    </div>
+    <div style="padding:32px;background:#fff">
+      <p style="color:#374151;font-size:16px">Hola <strong>${empresa}</strong>,</p>
+      <p style="color:#374151">Tu cita ha sido agendada. Aquí los detalles:</p>
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:24px;margin:24px 0">
+        <p style="margin:8px 0;color:#0369a1">📋 <strong>Tipo:</strong> ${tipo_encuentro}</p>
+        <p style="margin:8px 0;color:#0369a1">📅 <strong>Fecha:</strong> ${dateStr}</p>
+        <p style="margin:8px 0;color:#0369a1">🕐 <strong>Hora:</strong> ${timeRange} (hora Colombia)</p>
       </div>
-      <div style="padding:32px;background:#fff">
-        <p style="color:#374151;font-size:16px">Hola <strong>${empresa}</strong>,</p>
-        <p style="color:#374151">Tu cita ha sido agendada exitosamente. Aquí los detalles:</p>
-        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:24px;margin:24px 0">
-          <p style="margin:8px 0;color:#0369a1">📋 <strong>Tipo:</strong> ${tipo_encuentro}</p>
-          <p style="margin:8px 0;color:#0369a1">📅 <strong>Fecha:</strong> ${dateStr}</p>
-          <p style="margin:8px 0;color:#0369a1">🕐 <strong>Hora:</strong> ${timeRange} (hora Colombia)</p>
-        </div>
-        <p style="color:#6b7280;font-size:14px">
-          La invitación al calendario ha sido enviada a
-          <strong>${correo}</strong>. Revisa tu correo y acepta la invitación para que aparezca en tu calendario.
-        </p>
-        <p style="color:#6b7280;font-size:14px">
-          ¿Necesitas modificar o cancelar?
-          Escríbenos a <a href="mailto:info.visionbi@gmail.com" style="color:#3b82f6">info.visionbi@gmail.com</a>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;margin-bottom:24px">
+        <p style="margin:0;color:#166534;font-size:14px">
+          📎 <strong>Adjunto encontrarás el archivo de invitación al calendario.</strong><br>
+          Ábrelo o haz clic en él para agregarlo automáticamente a Google Calendar,
+          Outlook o Apple Calendar.
         </p>
       </div>
-      <div style="background:#f9fafb;padding:16px;text-align:center">
-        <p style="color:#9ca3af;font-size:12px;margin:0">© 2025 VisionBI. Todos los derechos reservados.</p>
+      <p style="color:#6b7280;font-size:14px">
+        ¿Necesitas modificar o cancelar? Escríbenos a
+        <a href="mailto:info.visionbi@gmail.com" style="color:#3b82f6">info.visionbi@gmail.com</a>
+      </p>
+    </div>
+    <div style="background:#f9fafb;padding:16px;text-align:center">
+      <p style="color:#9ca3af;font-size:12px;margin:0">© 2025 VisionBI. Todos los derechos reservados.</p>
+    </div>
+  </div>`;
+}
+
+// ─── Email interno (notificación VisionBI) ────────────────────────────────────
+
+function buildInternalEmailHtml(
+  empresa: string, nit_cedula: string, correo: string, telefono: string,
+  tipo_encuentro: string, motivo: string, dateStr: string, timeRange: string
+): string {
+  return `
+  <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
+    <div style="background:linear-gradient(135deg,#1e40af,#6d28d9);padding:28px;text-align:center">
+      <h1 style="color:#fff;margin:0;font-size:22px">📅 Nueva cita agendada</h1>
+      <p style="color:rgba(255,255,255,0.85);margin:8px 0 0">VisionBI – Notificación interna</p>
+    </div>
+    <div style="padding:32px;background:#fff">
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:24px;margin-bottom:24px">
+        <p style="margin:8px 0;color:#0369a1">📋 <strong>Tipo:</strong> ${tipo_encuentro}</p>
+        <p style="margin:8px 0;color:#0369a1">📅 <strong>Fecha:</strong> ${dateStr}</p>
+        <p style="margin:8px 0;color:#0369a1">🕐 <strong>Hora:</strong> ${timeRange} (hora Colombia)</p>
       </div>
-    </div>`;
+      <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:12px;padding:24px;margin-bottom:24px">
+        <h3 style="margin:0 0 16px;color:#111827;font-size:15px">Datos del cliente</h3>
+        <p style="margin:8px 0;color:#374151">🏢 <strong>Empresa:</strong> ${empresa}</p>
+        <p style="margin:8px 0;color:#374151">🪪 <strong>NIT / Cédula:</strong> ${nit_cedula}</p>
+        <p style="margin:8px 0;color:#374151">📧 <strong>Correo:</strong> ${correo}</p>
+        <p style="margin:8px 0;color:#374151">📱 <strong>Teléfono:</strong> ${telefono}</p>
+        <p style="margin:8px 0;color:#374151">💬 <strong>Motivo:</strong> ${motivo}</p>
+      </div>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px">
+        <p style="margin:0;color:#166534;font-size:13px">
+          📎 El archivo adjunto <strong>cita-visionbi.ics</strong> te permite agregar
+          este evento directamente a tu calendario.
+        </p>
+      </div>
+    </div>
+    <div style="background:#f9fafb;padding:16px;text-align:center">
+      <p style="color:#9ca3af;font-size:12px;margin:0">© 2025 VisionBI – Uso interno</p>
+    </div>
+  </div>`;
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -114,18 +190,13 @@ serve(async (req) => {
 
   try {
     const body = await req.json() as {
-      tipo_encuentro: string;
-      empresa:        string;
-      nit_cedula:     string;
-      correo:         string;
-      telefono:       string;
-      motivo:         string;
-      fecha_inicio:   string;
-      fecha_fin:      string;
+      tipo_encuentro: string; empresa: string; nit_cedula: string;
+      correo: string; telefono: string; motivo: string;
+      fecha_inicio: string; fecha_fin: string;
     };
     const { tipo_encuentro, empresa, nit_cedula, correo, telefono, motivo, fecha_inicio, fecha_fin } = body;
 
-    // 1. Upsert cliente en Supabase
+    // 1. Upsert cliente
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -136,94 +207,137 @@ serve(async (req) => {
       .upsert(
         { empresa, nit_cedula, correo, telefono, updated_at: new Date().toISOString() },
         { onConflict: "correo" }
-      )
-      .select()
-      .single();
-
+      ).select().single();
     if (clienteErr) throw clienteErr;
 
-    // 2. Crear agendamiento en Supabase
+    // 2. Crear agendamiento
     const { data: agenda, error: agendaErr } = await supabase
       .from("agendamientos")
       .insert({ cliente_id: cliente.id, tipo_encuentro, motivo, fecha_inicio, fecha_fin })
-      .select()
-      .single();
-
+      .select().single();
     if (agendaErr) throw agendaErr;
 
-    // 3. Crear evento en Google Calendar (invita al cliente automáticamente)
+    // 3. Crear evento en Google Calendar
     const calendarId  = Deno.env.get("GOOGLE_CALENDAR_ID")!;
     const accessToken = await getGoogleAccessToken();
 
     const eventRes = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?sendUpdates=all`,
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
       {
         method:  "POST",
-        headers: {
-          Authorization:  `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           summary:     `${tipo_encuentro} – ${empresa} | VisionBI`,
-          description: `Empresa: ${empresa}\nNIT/Cédula: ${nit_cedula}\nTeléfono: ${telefono}\nMotivo: ${motivo}`,
-          start:       { dateTime: fecha_inicio, timeZone: "America/Bogota" },
-          end:         { dateTime: fecha_fin,    timeZone: "America/Bogota" },
-          attendees:   [{ email: correo }],
+          description: `Empresa: ${empresa}\nNIT/Cédula: ${nit_cedula}\nTeléfono: ${telefono}\nCorreo: ${correo}\nMotivo: ${motivo}`,
+          start: { dateTime: fecha_inicio, timeZone: "America/Bogota" },
+          end:   { dateTime: fecha_fin,    timeZone: "America/Bogota" },
         }),
       }
     );
     const eventData = await eventRes.json();
 
-    // Guardar el ID del evento de Google
-    if (eventData.id) {
-      await supabase
-        .from("agendamientos")
+    let calendarStatus = "ok";
+    if (!eventRes.ok) {
+      calendarStatus = `error ${eventRes.status}: ${JSON.stringify(eventData)}`;
+      console.error("[Calendar] Error:", calendarStatus);
+    } else {
+      console.log("[Calendar] Evento creado:", eventData.id);
+      await supabase.from("agendamientos")
         .update({ google_event_id: eventData.id })
         .eq("id", agenda.id);
     }
 
-    // 4. Enviar correo de confirmación al cliente vía Resend
+    // 4. Generar ICS
+    const fromEmail = Deno.env.get("FROM_EMAIL") ?? "agenda.visionbi@gmail.com";
+    const icsContent = generateICS({
+      uid:         agenda.id,
+      summary:     `${tipo_encuentro} – VisionBI`,
+      description: `Empresa: ${empresa} | Motivo: ${motivo}`,
+      startISO:    fecha_inicio,
+      endISO:      fecha_fin,
+      organizer:   fromEmail,
+      attendee:    correo,
+    });
+    const icsBase64 = icsToBase64(icsContent);
+
     const resendKey = Deno.env.get("RESEND_API_KEY")!;
-    const fromEmail = Deno.env.get("FROM_EMAIL") ?? "citas@visionbi.co";
 
     const opts: Intl.DateTimeFormatOptions = {
-      timeZone: "America/Bogota",
-      weekday: "long",
-      year:    "numeric",
-      month:   "long",
-      day:     "numeric",
+      timeZone: "America/Bogota", weekday: "long", year: "numeric",
+      month: "long", day: "numeric",
     };
     const timeOpts: Intl.DateTimeFormatOptions = {
-      timeZone: "America/Bogota",
-      hour:   "2-digit",
-      minute: "2-digit",
-      hour12: true,
+      timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: true,
     };
-    const start    = new Date(fecha_inicio);
-    const end      = new Date(fecha_fin);
-    const dateStr  = start.toLocaleDateString("es-CO", opts);
+    const start     = new Date(fecha_inicio);
+    const end       = new Date(fecha_fin);
+    const dateStr   = start.toLocaleDateString("es-CO", opts);
     const timeRange = `${start.toLocaleTimeString("es-CO", timeOpts)} – ${end.toLocaleTimeString("es-CO", timeOpts)}`;
 
-    await fetch("https://api.resend.com/emails", {
+    const icsAttachment = {
+      filename:     "cita-visionbi.ics",
+      content:      icsBase64,
+      content_type: "text/calendar; method=REQUEST",
+    };
+
+    // 5a. Correo al cliente
+    const clientRes  = await fetch("https://api.resend.com/emails", {
       method:  "POST",
-      headers: {
-        Authorization:  `Bearer ${resendKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from:    `VisionBI <${fromEmail}>`,
-        to:      [correo],
-        subject: `✅ Cita confirmada: ${tipo_encuentro} – VisionBI`,
-        html:    buildEmailHtml(empresa, tipo_encuentro, correo, dateStr, timeRange),
+        from:        `VisionBI <${fromEmail}>`,
+        to:          [correo],
+        subject:     `✅ Cita confirmada: ${tipo_encuentro} – VisionBI`,
+        html:        buildClientEmailHtml(empresa, tipo_encuentro, dateStr, timeRange),
+        attachments: [icsAttachment],
       }),
     });
+    const clientData = await clientRes.json();
+
+    let emailStatus = "ok";
+    if (!clientRes.ok) {
+      emailStatus = `error ${clientRes.status}: ${JSON.stringify(clientData)}`;
+      console.error("[Resend] Error correo cliente:", emailStatus);
+    } else {
+      console.log("[Resend] Correo cliente enviado:", clientData.id);
+    }
+
+    // 5b. Notificación interna (si NOTIFY_EMAIL está configurado)
+    const notifyEmail = Deno.env.get("NOTIFY_EMAIL");
+    if (notifyEmail) {
+      const internalRes = await fetch("https://api.resend.com/emails", {
+        method:  "POST",
+        headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from:        `VisionBI <${fromEmail}>`,
+          to:          [notifyEmail],
+          subject:     `📅 Nueva cita: ${tipo_encuentro} – ${empresa}`,
+          html:        buildInternalEmailHtml(
+                         empresa, nit_cedula, correo, telefono,
+                         tipo_encuentro, motivo, dateStr, timeRange
+                       ),
+          attachments: [icsAttachment],
+        }),
+      });
+      const internalData = await internalRes.json();
+      if (!internalRes.ok) {
+        console.error("[Resend] Error notificación interna:", internalData);
+      } else {
+        console.log("[Resend] Notificación interna enviada:", internalData.id);
+      }
+    }
 
     return new Response(
-      JSON.stringify({ success: true, agendamiento_id: agenda.id }),
+      JSON.stringify({
+        success:         true,
+        agendamiento_id: agenda.id,
+        calendar_status: calendarStatus,
+        email_status:    emailStatus,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error(err);
+    console.error("[Error general]", err);
     return new Response(JSON.stringify({ error: err.message }), {
       status:  500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

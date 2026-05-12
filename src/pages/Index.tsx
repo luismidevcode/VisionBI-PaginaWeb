@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header       from "@/components/Header";
 import Hero         from "@/components/Hero";
 import Services     from "@/components/Services";
@@ -15,6 +15,14 @@ const Index = () => {
     setMeetingType(type);
     setBookingOpen(true);
   };
+
+  // Abre el modal automáticamente si la URL contiene ?reservar
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("reservar")) {
+      openBooking("Diagnóstico Gratis");
+    }
+  }, []);
 
   return (
     <div className="min-h-screen">
