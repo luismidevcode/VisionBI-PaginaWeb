@@ -185,24 +185,28 @@ const Portal = () => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await supabase.functions.invoke<{ success: boolean; error?: string }>(
-        "register-client",
-        { body: { mode: "set-password", nit_cedula: regNit, password: values.password } }
-      );
+      const { data } = await supabase.functions.invoke<{
+        success: boolean; error?: string;
+        access_token?: string; refresh_token?: string;
+      }>("register-client", {
+        body: { mode: "set-password", nit_cedula: regNit, password: values.password },
+      });
       if (!data?.success) {
         setError(data?.error ?? "Error al crear la cuenta.");
         return;
       }
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email:    regFoundEmail,
-        password: values.password,
-      });
-      if (authError) {
-        setError("Cuenta creada. Por favor inicia sesión.");
-        handleTabChange("login");
+      if (data.access_token && data.refresh_token) {
+        await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
+        navigate("/portal/dashboard");
         return;
       }
-      navigate("/portal/dashboard");
+      // Fallback si el servidor no devolvió sesión
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: regFoundEmail, password: values.password,
+      });
+      if (!authError) { navigate("/portal/dashboard"); return; }
+      setError("Cuenta creada. Por favor inicia sesión.");
+      handleTabChange("login");
     } catch {
       setError("Error al crear la cuenta. Intenta de nuevo.");
     } finally {
@@ -216,33 +220,35 @@ const Portal = () => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await supabase.functions.invoke<{ success: boolean; error?: string }>(
-        "register-client",
-        {
-          body: {
-            empresa:           values.empresa,
-            nit_cedula:        values.nit_cedula,
-            correo:            values.correo,
-            telefono:          values.telefono,
-            num_colaboradores: values.num_colaboradores,
-            password:          values.password,
-          },
-        }
-      );
+      const { data } = await supabase.functions.invoke<{
+        success: boolean; error?: string;
+        access_token?: string; refresh_token?: string;
+      }>("register-client", {
+        body: {
+          empresa:           values.empresa,
+          nit_cedula:        values.nit_cedula,
+          correo:            values.correo,
+          telefono:          values.telefono,
+          num_colaboradores: values.num_colaboradores,
+          password:          values.password,
+        },
+      });
       if (!data?.success) {
         setError(data?.error ?? "Error al registrarse.");
         return;
       }
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email:    values.correo,
-        password: values.password,
-      });
-      if (authError) {
-        setError("Cuenta creada. Por favor inicia sesión.");
-        handleTabChange("login");
+      if (data.access_token && data.refresh_token) {
+        await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
+        navigate("/portal/dashboard");
         return;
       }
-      navigate("/portal/dashboard");
+      // Fallback si el servidor no devolvió sesión
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: values.correo, password: values.password,
+      });
+      if (!authError) { navigate("/portal/dashboard"); return; }
+      setError("Cuenta creada. Por favor inicia sesión.");
+      handleTabChange("login");
     } catch {
       setError("Error al registrarse. Intenta de nuevo.");
     } finally {
