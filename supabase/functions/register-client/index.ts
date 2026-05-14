@@ -10,18 +10,64 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { empresa, nit_cedula, correo, telefono, password } =
-      await req.json() as {
-        empresa: string; nit_cedula: string; correo: string;
-        telefono: string; password: string;
-      };
+    const body = await req.json() as {
+      mode?: "set-password";
+      nit_cedula: string;
+      password: string;
+      empresa?: string;
+      correo?: string;
+      telefono?: string;
+      num_colaboradores?: string;
+    };
+    const { mode, nit_cedula, password } = body;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Si el NIT ya existe con un correo diferente, rechazar
+    // ── Modo: solo crear contraseña para cliente ya registrado ──────────────
+    if (mode === "set-password") {
+      const { data: clienteRow } = await supabase
+        .from("clientes")
+        .select("correo")
+        .eq("nit_cedula", nit_cedula.trim())
+        .maybeSingle();
+
+      if (!clienteRow) {
+        return new Response(
+          JSON.stringify({ error: "NIT/Cédula no encontrado." }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { error: authError } = await supabase.auth.admin.createUser({
+        email:         clienteRow.correo,
+        password,
+        email_confirm: true,
+      });
+
+      if (authError) {
+        const msg = authError.message.toLowerCase();
+        if (msg.includes("already registered") || msg.includes("already been registered")) {
+          return new Response(
+            JSON.stringify({ error: "Ya tienes una cuenta activa. Por favor inicia sesión." }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        throw authError;
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, correo: clienteRow.correo }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── Modo: registro completo (nuevo cliente) ──────────────────────────────
+    const { empresa, correo, telefono, num_colaboradores } = body;
+
+    // Si el NIT ya existe con otro correo, rechazar
     const { data: existingByNit } = await supabase
       .from("clientes")
       .select("correo")
@@ -35,9 +81,8 @@ serve(async (req) => {
       );
     }
 
-    // Crear usuario en Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email:         correo,
+    const { error: authError } = await supabase.auth.admin.createUser({
+      email:         correo!,
       password,
       email_confirm: true,
     });
@@ -53,11 +98,17 @@ serve(async (req) => {
       throw authError;
     }
 
-    // Upsert en clientes (vincula diagnósticos previos si los hay)
     const { error: clienteError } = await supabase
       .from("clientes")
       .upsert(
-        { empresa, nit_cedula: nit_cedula.trim(), correo, telefono, updated_at: new Date().toISOString() },
+        {
+          empresa,
+          nit_cedula:        nit_cedula.trim(),
+          correo,
+          telefono,
+          num_colaboradores: num_colaboradores ?? null,
+          updated_at:        new Date().toISOString(),
+        },
         { onConflict: "correo" }
       );
     if (clienteError) throw clienteError;

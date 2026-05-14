@@ -373,10 +373,24 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Bloquear si el NIT ya existe (ya es cliente o ya agendó diagnóstico)
+    const { data: existingByNit } = await supabase
+      .from("clientes")
+      .select("id")
+      .eq("nit_cedula", nit_cedula.trim())
+      .maybeSingle();
+
+    if (existingByNit) {
+      return new Response(
+        JSON.stringify({ error: "ALREADY_CLIENT" }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { data: cliente, error: clienteErr } = await supabase
       .from("clientes")
       .upsert(
-        { empresa, nit_cedula, correo, telefono, updated_at: new Date().toISOString() },
+        { empresa, nit_cedula, correo, telefono, num_colaboradores, updated_at: new Date().toISOString() },
         { onConflict: "correo" }
       ).select().single();
     if (clienteErr) throw clienteErr;

@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Link }     from "react-router-dom";
 import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -124,6 +125,7 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
   const [slotsError,    setSlotsError]    = useState<string | null>(null);
   const [submitting,    setSubmitting]    = useState(false);
   const [submitError,   setSubmitError]   = useState<string | null>(null);
+  const [nitExists,     setNitExists]     = useState(false);
   const [confirmed,     setConfirmed]     = useState<ConfirmedBooking | null>(null);
 
   // Días disponibles del mes mostrado
@@ -226,8 +228,19 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
     if (!selectedSlot) return;
     setSubmitting(true);
     setSubmitError(null);
+    setNitExists(false);
 
     try {
+      // Verificar si el NIT ya está registrado
+      const { data: nitCheck } = await supabase.functions.invoke<{ correo: string }>(
+        "lookup-nit",
+        { body: { nit_cedula: values.nit_cedula } }
+      );
+      if (nitCheck?.correo) {
+        setNitExists(true);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("book-appointment", {
         body: {
           ...values,
@@ -260,6 +273,7 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
     setSelectedSlot(null);
     setSlotsError(null);
     setSubmitError(null);
+    setNitExists(false);
     setConfirmed(null);
     setAvailableDays(new Set());
     setDaysLoaded(false);
@@ -519,7 +533,22 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
                 )}
               />
 
-              {submitError && (
+              {nitExists && (
+                <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    Este NIT ya está registrado en VisionBI
+                  </div>
+                  <p className="text-sm text-amber-700">
+                    Ya agendaste un diagnóstico o eres cliente activo. Para agendar sesiones, accede al portal de clientes.
+                  </p>
+                  <Link to="/portal" className="inline-block text-sm font-semibold text-[#1a3461] underline">
+                    → Ir al Portal de Clientes
+                  </Link>
+                </div>
+              )}
+
+              {submitError && !nitExists && (
                 <div className="flex items-center gap-2 text-destructive text-sm">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
                   {submitError}
