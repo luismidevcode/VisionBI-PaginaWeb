@@ -110,7 +110,7 @@ serve(async (req) => {
         {
           empresa,
           nit_cedula:        nit_cedula.trim(),
-          correo,
+          correo:            correo!.toLowerCase(),
           telefono,
           num_colaboradores: num_colaboradores ?? null,
           updated_at:        new Date().toISOString(),

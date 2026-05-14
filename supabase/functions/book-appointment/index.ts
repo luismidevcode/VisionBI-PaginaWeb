@@ -390,7 +390,7 @@ serve(async (req) => {
     const { data: cliente, error: clienteErr } = await supabase
       .from("clientes")
       .upsert(
-        { empresa, nit_cedula, correo, telefono, num_colaboradores, updated_at: new Date().toISOString() },
+        { empresa, nit_cedula, correo: correo.toLowerCase(), telefono, num_colaboradores, updated_at: new Date().toISOString() },
         { onConflict: "correo" }
       ).select().single();
     if (clienteErr) throw clienteErr;

@@ -54,7 +54,8 @@ const Dashboard = () => {
       const { data: cl } = await supabase
         .from("clientes")
         .select("id, empresa, nit_cedula, correo, telefono")
-        .single();
+        .eq("correo", session.user.email!)
+        .maybeSingle();
 
       if (!cl) { navigate("/portal"); return; }
 
