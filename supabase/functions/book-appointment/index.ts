@@ -9,59 +9,22 @@ const corsHeaders = {
 
 // ─── Google Auth ──────────────────────────────────────────────────────────────
 
-function base64url(input: string | Uint8Array): string {
-  const str =
-    typeof input === "string"
-      ? btoa(unescape(encodeURIComponent(input)))
-      : btoa(String.fromCharCode(...input));
-  return str.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-}
-
-async function getGoogleAccessToken(
-  scopes = "https://www.googleapis.com/auth/calendar"
-): Promise<string> {
-  const email = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_EMAIL")!;
-  const pem   = Deno.env.get("GOOGLE_PRIVATE_KEY")!.replace(/\\n/g, "\n");
-  const now   = Math.floor(Date.now() / 1000);
-
-  const header  = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const payload = base64url(JSON.stringify({
-    iss:   email,
-    scope: scopes,
-    aud:   "https://oauth2.googleapis.com/token",
-    exp:   now + 3600,
-    iat:   now,
-  }));
-  const signingInput = `${header}.${payload}`;
-
-  const pemContent = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
-    .replace(/-----END PRIVATE KEY-----/g, "")
-    .replace(/\s/g, "");
-
-  const binaryKey = Uint8Array.from(atob(pemContent), (c) => c.charCodeAt(0));
-  const cryptoKey = await crypto.subtle.importKey(
-    "pkcs8", binaryKey,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false, ["sign"]
-  );
-  const sig = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5", cryptoKey,
-    new TextEncoder().encode(signingInput)
-  );
-
-  const jwt  = `${signingInput}.${base64url(new Uint8Array(sig))}`;
-  const res  = await fetch("https://oauth2.googleapis.com/token", {
+// OAuth 2.0 con refresh_token del usuario propietario del calendario.
+// Necesario para crear eventos con Google Meet (conferenceDataVersion=1).
+async function getOAuthAccessToken(): Promise<string> {
+  const res = await fetch("https://oauth2.googleapis.com/token", {
     method:  "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body:    new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion:  jwt,
+      client_id:     Deno.env.get("GOOGLE_OAUTH_CLIENT_ID")!,
+      client_secret: Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET")!,
+      refresh_token: Deno.env.get("GOOGLE_REFRESH_TOKEN")!,
+      grant_type:    "refresh_token",
     }),
   });
   const data = await res.json();
   if (!data.access_token)
-    throw new Error(`Google auth failed: ${JSON.stringify(data)}`);
+    throw new Error(`OAuth token failed: ${JSON.stringify(data)}`);
   return data.access_token;
 }
 
@@ -286,9 +249,19 @@ function buildInternalEmailHtml(
                  padding:8px 0 2px;border-top:1px solid #e2e8f0">${value}</td>
     </tr>`;
 
-  const meetRow = meetLink
-    ? row("Google Meet", `<a href="${meetLink}" style="color:#1a3461;word-break:break-all">${meetLink}</a>`)
-    : "";
+  const meetBtn = meetLink ? `
+    <div style="text-align:center;margin:20px 0">
+      <a href="${meetLink}" target="_blank"
+         style="display:inline-block;background:#1a3461;color:#ffffff;
+                padding:11px 28px;border-radius:6px;text-decoration:none;
+                font-family:Arial,sans-serif;font-weight:700;font-size:13px;
+                letter-spacing:0.5px">
+        Unirse a Google Meet
+      </a>
+      <p style="margin:8px 0 0;font-family:Arial,sans-serif;color:#64748b;font-size:11px">
+        <a href="${meetLink}" style="color:#1a3461;word-break:break-all">${meetLink}</a>
+      </p>
+    </div>` : "";
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -330,9 +303,10 @@ function buildInternalEmailHtml(
         ${row("Tipo de reunión", `<strong>${tipo_encuentro}</strong>`)}
         ${row("Fecha", `<span style="text-transform:capitalize">${dateStr}</span>`)}
         ${row("Hora (Colombia)", timeRange)}
-        ${meetRow}
       </table>
     </div>
+
+    ${meetBtn}
 
     <div style="height:20px"></div>
 
@@ -414,27 +388,9 @@ serve(async (req) => {
       .select().single();
     if (agendaErr) throw agendaErr;
 
-    // 3a. Crear Google Meet space (Meet REST API — funciona con Gmail personal)
-    const meetScopes =
-      "https://www.googleapis.com/auth/calendar " +
-      "https://www.googleapis.com/auth/meetings.space.created";
-    const accessToken = await getGoogleAccessToken(meetScopes);
+    const accessToken = await getOAuthAccessToken();
 
-    let meetLink = "";
-    const meetRes = await fetch("https://meet.googleapis.com/v2/spaces", {
-      method:  "POST",
-      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({}),
-    });
-    const meetData = await meetRes.json();
-    if (meetRes.ok) {
-      meetLink = meetData.meetingUri ?? "";
-      console.log("[Meet] Space creado:", meetLink);
-    } else {
-      console.error("[Meet] Error:", JSON.stringify(meetData));
-    }
-
-    // 3b. Crear evento en Google Calendar (sin conferenceData — incluye Meet en descripción)
+    // 3. Crear evento en Google Calendar con Meet integrado (conferenceDataVersion=1)
     const calendarId = Deno.env.get("GOOGLE_CALENDAR_ID")!;
     const calDesc    = [
       `Empresa: ${empresa}`,
@@ -443,31 +399,57 @@ serve(async (req) => {
       `Teléfono: ${telefono}`,
       `Correo: ${correo}`,
       `Motivo: ${motivo}`,
-      meetLink ? `\nGoogle Meet: ${meetLink}` : "",
-    ].filter(Boolean).join("\n");
+    ].join("\n");
+
+    const notifyEmail = Deno.env.get("NOTIFY_EMAIL") ?? "";
+    const attendees = [
+      { email: correo },
+      ...(notifyEmail ? [{ email: notifyEmail }] : []),
+    ];
 
     const eventRes = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?conferenceDataVersion=1&sendUpdates=none`,
       {
         method:  "POST",
         headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           summary:     `${tipo_encuentro} – ${empresa} | VisionBI`,
           description: calDesc,
-          location:    meetLink || "Google Meet",
-          start: { dateTime: fecha_inicio, timeZone: "America/Bogota" },
-          end:   { dateTime: fecha_fin,    timeZone: "America/Bogota" },
+          start:       { dateTime: fecha_inicio, timeZone: "America/Bogota" },
+          end:         { dateTime: fecha_fin,    timeZone: "America/Bogota" },
+          attendees,
+          conferenceData: {
+            createRequest: {
+              requestId:             agenda.id,
+              conferenceSolutionKey: { type: "hangoutsMeet" },
+            },
+          },
         }),
       }
     );
     const eventData = await eventRes.json();
 
+    let meetLink    = "";
+    let meetError   = "";
     let calendarStatus = "ok";
     if (!eventRes.ok) {
       calendarStatus = `error ${eventRes.status}: ${JSON.stringify(eventData)}`;
       console.error("[Calendar] Error:", calendarStatus);
     } else {
       console.log("[Calendar] Evento creado:", eventData.id);
+      // Extraer enlace Meet del evento creado
+      const entryPoints: { entryPointType: string; uri: string }[] =
+        eventData.conferenceData?.entryPoints ?? [];
+      const videoEntry = entryPoints.find((e) => e.entryPointType === "video");
+      meetLink = videoEntry?.uri ?? eventData.conferenceData?.conferenceId
+        ? `https://meet.google.com/${eventData.conferenceData.conferenceId}`
+        : "";
+      if (!meetLink) {
+        meetError = `Meet no incluido: ${JSON.stringify(eventData.conferenceData ?? {})}`;
+        console.warn("[Meet]", meetError);
+      } else {
+        console.log("[Meet] Enlace obtenido:", meetLink);
+      }
       await supabase.from("agendamientos")
         .update({ google_event_id: eventData.id })
         .eq("id", agenda.id);
@@ -536,7 +518,6 @@ serve(async (req) => {
     }
 
     // 6b. Notificación interna
-    const notifyEmail = Deno.env.get("NOTIFY_EMAIL");
     if (notifyEmail) {
       const internalRes = await fetch("https://api.resend.com/emails", {
         method:  "POST",
@@ -566,6 +547,7 @@ serve(async (req) => {
         success:         true,
         agendamiento_id: agenda.id,
         meet_link:       meetLink,
+        meet_error:      meetError || undefined,
         calendar_status: calendarStatus,
         email_status:    emailStatus,
       }),

@@ -460,8 +460,11 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
                   <FormItem>
                     <FormLabel>NIT / Cédula</FormLabel>
                     <FormControl>
-                      <Input placeholder="900.123.456-7" {...field} />
+                      <Input placeholder="900123456" {...field} />
                     </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Para NIT, ingresa solo el número sin dígito de verificación.
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}
