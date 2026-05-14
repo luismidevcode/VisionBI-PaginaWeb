@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import visionbiLogo from "@/assets/logo-vision-BI--sin-fondo.png";
 
 interface HeaderProps {
@@ -15,6 +16,7 @@ const menuItems = [
 ];
 
 const Header = ({ onOpenBooking }: HeaderProps) => {
+  const navigate = useNavigate();
   const [isMenuOpen,    setIsMenuOpen]    = useState(false);
   const [activeSection, setActiveSection] = useState("");
 
@@ -69,7 +71,15 @@ const Header = ({ onOpenBooking }: HeaderProps) => {
           </nav>
 
           {/* CTA escritorio */}
-          <div className="hidden md:flex">
+          <div className="hidden md:flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => navigate("/portal")}
+              className="border-[#1a3461] text-[#1a3461] hover:bg-[#1a3461] hover:text-white"
+            >
+              Portal Clientes
+            </Button>
             <Button variant="gradient" size="lg" onClick={() => onOpenBooking("Diagnóstico Gratis")}>
               Diagnóstico Gratis
             </Button>
@@ -100,9 +110,17 @@ const Header = ({ onOpenBooking }: HeaderProps) => {
                 </a>
               ))}
               <Button
+                variant="outline"
+                size="lg"
+                className="border-[#1a3461] text-[#1a3461] hover:bg-[#1a3461] hover:text-white"
+                onClick={() => { setIsMenuOpen(false); navigate("/portal"); }}
+              >
+                Portal Clientes
+              </Button>
+              <Button
                 variant="gradient"
                 size="lg"
-                className="mt-4"
+                className="mt-2"
                 onClick={() => { setIsMenuOpen(false); onOpenBooking("Diagnóstico Gratis"); }}
               >
                 Diagnóstico Gratis
