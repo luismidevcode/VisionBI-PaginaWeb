@@ -113,52 +113,150 @@ function icsToBase64(ics: string): string {
 
 function buildClientEmailHtml(
   empresa: string, tipo_encuentro: string,
-  dateStr: string, timeRange: string, meetLink: string
+  dateStr: string, timeRange: string, meetLink: string, logoUrl: string
 ): string {
-  const meetSection = meetLink ? `
-      <div style="text-align:center;margin:24px 0">
+  const logoImg = logoUrl
+    ? `<img src="${logoUrl}" alt="VisionBI" height="52"
+            style="display:block;height:52px;max-height:52px;margin:0 auto 14px;object-fit:contain" />`
+    : "";
+
+  const meetBtn = meetLink ? `
+      <div style="text-align:center;margin:28px 0 20px">
         <a href="${meetLink}" target="_blank"
-           style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#8b5cf6);
-                  color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;
-                  font-weight:600;font-size:15px">
-          🎥 Unirse a Google Meet
+           style="display:inline-block;background:#1d4ed8;color:#ffffff;
+                  padding:13px 32px;border-radius:6px;text-decoration:none;
+                  font-family:Georgia,serif;font-weight:700;font-size:14px;
+                  letter-spacing:0.5px;border:2px solid #1e40af">
+          Unirse a la reunión — Google Meet
         </a>
-        <p style="margin:8px 0 0;color:#6b7280;font-size:12px">
-          O copia el enlace: <a href="${meetLink}" style="color:#3b82f6">${meetLink}</a>
+        <p style="margin:10px 0 0;font-family:Arial,sans-serif;color:#64748b;font-size:11px">
+          Enlace directo:
+          <a href="${meetLink}" style="color:#2563eb;word-break:break-all">${meetLink}</a>
         </p>
       </div>` : "";
 
-  return `
-  <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
-    <div style="background:linear-gradient(135deg,#3b82f6,#8b5cf6);padding:32px;text-align:center">
-      <h1 style="color:#fff;margin:0;font-size:24px">¡Tu cita está confirmada!</h1>
-      <p style="color:rgba(255,255,255,0.85);margin:8px 0 0">VisionBI – Business Intelligence</p>
+  const divider = `<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0" />`;
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
+<tr><td>
+<div style="max-width:580px;margin:0 auto;background:#ffffff;border-radius:8px;
+            overflow:hidden;border:1px solid #cbd5e1;box-shadow:0 2px 8px rgba(0,0,0,0.07)">
+
+  <!-- CABECERA -->
+  <div style="background:#0f172a;padding:32px 40px;text-align:center">
+    ${logoImg}
+    <p style="margin:0;font-family:Georgia,serif;font-size:22px;font-weight:700;
+              color:#ffffff;letter-spacing:0.5px">VisionBI</p>
+    <p style="margin:6px 0 0;font-family:Arial,sans-serif;font-size:12px;
+              color:#94a3b8;letter-spacing:1.5px;text-transform:uppercase">
+      Business Intelligence
+    </p>
+  </div>
+
+  <!-- BANDA DE TÍTULO -->
+  <div style="background:#1d4ed8;padding:14px 40px;text-align:center">
+    <p style="margin:0;font-family:Georgia,serif;font-size:15px;font-weight:400;
+              color:#bfdbfe;letter-spacing:0.3px">
+      Confirmación de Cita
+    </p>
+  </div>
+
+  <!-- CUERPO -->
+  <div style="padding:36px 40px;background:#ffffff">
+
+    <p style="margin:0 0 8px;font-family:Georgia,serif;font-size:16px;color:#0f172a;font-weight:700">
+      Estimado/a equipo de ${empresa}:
+    </p>
+    <p style="margin:0 0 24px;font-family:Arial,sans-serif;font-size:14px;line-height:1.7;color:#334155">
+      Nos complace confirmar su próxima reunión con VisionBI.
+      A continuación encontrará los detalles de la cita agendada:
+    </p>
+
+    <!-- DETALLES -->
+    <div style="background:#f8fafc;border:1px solid #cbd5e1;border-left:4px solid #1d4ed8;
+                border-radius:4px;padding:20px 24px;margin-bottom:20px">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;
+                     color:#64748b;text-transform:uppercase;letter-spacing:1px;
+                     padding-bottom:4px" colspan="2">Tipo de reunión</td>
+        </tr>
+        <tr>
+          <td style="font-family:Georgia,serif;font-size:16px;color:#0f172a;font-weight:700;
+                     padding-bottom:16px" colspan="2">${tipo_encuentro}</td>
+        </tr>
+        <tr>
+          <td width="50%" style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;
+                                  color:#64748b;text-transform:uppercase;letter-spacing:1px;
+                                  padding-bottom:4px">Fecha</td>
+          <td width="50%" style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;
+                                  color:#64748b;text-transform:uppercase;letter-spacing:1px;
+                                  padding-bottom:4px">Hora (Colombia)</td>
+        </tr>
+        <tr>
+          <td style="font-family:Arial,sans-serif;font-size:14px;color:#1e293b;
+                     font-weight:600;padding-bottom:0;text-transform:capitalize">${dateStr}</td>
+          <td style="font-family:Arial,sans-serif;font-size:14px;color:#1e293b;
+                     font-weight:600;padding-bottom:0">${timeRange}</td>
+        </tr>
+      </table>
     </div>
-    <div style="padding:32px;background:#fff">
-      <p style="color:#374151;font-size:16px">Hola <strong>${empresa}</strong>,</p>
-      <p style="color:#374151">Tu cita ha sido agendada. Aquí los detalles:</p>
-      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:24px;margin:24px 0">
-        <p style="margin:8px 0;color:#0369a1">📋 <strong>Tipo:</strong> ${tipo_encuentro}</p>
-        <p style="margin:8px 0;color:#0369a1">📅 <strong>Fecha:</strong> ${dateStr}</p>
-        <p style="margin:8px 0;color:#0369a1">🕐 <strong>Hora:</strong> ${timeRange} (hora Colombia)</p>
-      </div>
-      ${meetSection}
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;margin-bottom:24px">
-        <p style="margin:0;color:#166534;font-size:14px">
-          📎 <strong>Adjunto encontrarás el archivo de invitación al calendario.</strong><br>
-          Ábrelo o haz clic en él para agregarlo automáticamente a Google Calendar,
-          Outlook o Apple Calendar.
-        </p>
-      </div>
-      <p style="color:#6b7280;font-size:14px">
-        ¿Necesitas modificar o cancelar? Escríbenos a
-        <a href="mailto:info.visionbi@gmail.com" style="color:#3b82f6">info.visionbi@gmail.com</a>
+
+    ${meetBtn}
+    ${divider}
+
+    <!-- INSTRUCCIÓN ICS -->
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;
+                padding:16px 20px;margin-bottom:24px">
+      <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;
+                line-height:1.6;color:#14532d">
+        <strong>Invitación al calendario adjunta.</strong><br>
+        Encontrará adjunto el archivo <em>cita-visionbi.ics</em>.
+        Al abrirlo o hacer clic en él, la cita se agregará automáticamente
+        a Google Calendar, Outlook o Apple Calendar.
       </p>
     </div>
-    <div style="background:#f9fafb;padding:16px;text-align:center">
-      <p style="color:#9ca3af;font-size:12px;margin:0">© 2025 VisionBI. Todos los derechos reservados.</p>
-    </div>
-  </div>`;
+
+    <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;line-height:1.7;color:#475569">
+      Si necesita modificar o cancelar esta cita, por favor contáctenos
+      con al menos 24 horas de anticipación a través de:<br>
+      <a href="mailto:info.visionbi@gmail.com" style="color:#1d4ed8;font-weight:600">
+        info.visionbi@gmail.com
+      </a>
+    </p>
+
+    ${divider}
+
+    <p style="margin:0;font-family:Georgia,serif;font-size:13px;color:#334155;font-style:italic">
+      Agradecemos su confianza en VisionBI.<br>
+      Quedamos atentos a cualquier inquietud que pueda surgir.
+    </p>
+    <p style="margin:12px 0 0;font-family:Arial,sans-serif;font-size:13px;
+              color:#0f172a;font-weight:600">
+      Equipo VisionBI
+    </p>
+
+  </div>
+
+  <!-- PIE -->
+  <div style="background:#0f172a;padding:20px 40px;text-align:center">
+    <p style="margin:0 0 4px;font-family:Arial,sans-serif;font-size:11px;color:#94a3b8">
+      © 2025 VisionBI — Business Intelligence
+    </p>
+    <p style="margin:0;font-family:Arial,sans-serif;font-size:11px;color:#64748b">
+      Este mensaje es de carácter confidencial y está dirigido exclusivamente a su destinatario.
+    </p>
+  </div>
+
+</div>
+</td></tr>
+</table>
+</body>
+</html>`;
 }
 
 // ─── Email interno ────────────────────────────────────────────────────────────
@@ -166,40 +264,104 @@ function buildClientEmailHtml(
 function buildInternalEmailHtml(
   empresa: string, nit_cedula: string, correo: string, telefono: string,
   num_colaboradores: string, tipo_encuentro: string, motivo: string,
-  dateStr: string, timeRange: string, meetLink: string
+  dateStr: string, timeRange: string, meetLink: string, logoUrl: string
 ): string {
-  const meetSection = meetLink ? `
-        <p style="margin:8px 0;color:#374151">🎥 <strong>Meet:</strong>
-          <a href="${meetLink}" style="color:#3b82f6">${meetLink}</a>
-        </p>` : "";
+  const logoImg = logoUrl
+    ? `<img src="${logoUrl}" alt="VisionBI" height="44"
+            style="display:block;height:44px;max-height:44px;margin:0 auto 12px;object-fit:contain" />`
+    : "";
 
-  return `
-  <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
-    <div style="background:linear-gradient(135deg,#1e40af,#6d28d9);padding:28px;text-align:center">
-      <h1 style="color:#fff;margin:0;font-size:22px">📅 Nueva cita agendada</h1>
-      <p style="color:rgba(255,255,255,0.85);margin:8px 0 0">VisionBI – Notificación interna</p>
+  const row = (label: string, value: string) => `
+    <tr>
+      <td style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#64748b;
+                 text-transform:uppercase;letter-spacing:0.8px;padding:8px 0 2px;
+                 border-top:1px solid #e2e8f0;width:38%">${label}</td>
+      <td style="font-family:Arial,sans-serif;font-size:13px;color:#1e293b;
+                 padding:8px 0 2px;border-top:1px solid #e2e8f0">${value}</td>
+    </tr>`;
+
+  const meetRow = meetLink
+    ? row("Google Meet", `<a href="${meetLink}" style="color:#1d4ed8;word-break:break-all">${meetLink}</a>`)
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
+<tr><td>
+<div style="max-width:580px;margin:0 auto;background:#ffffff;border-radius:8px;
+            overflow:hidden;border:1px solid #cbd5e1;box-shadow:0 2px 8px rgba(0,0,0,0.07)">
+
+  <!-- CABECERA -->
+  <div style="background:#0f172a;padding:28px 40px;text-align:center">
+    ${logoImg}
+    <p style="margin:0;font-family:Georgia,serif;font-size:20px;font-weight:700;
+              color:#ffffff;letter-spacing:0.5px">VisionBI</p>
+    <p style="margin:5px 0 0;font-family:Arial,sans-serif;font-size:11px;
+              color:#94a3b8;letter-spacing:1.5px;text-transform:uppercase">
+      Notificación Interna
+    </p>
+  </div>
+
+  <!-- BANDA DE TÍTULO -->
+  <div style="background:#4f46e5;padding:12px 40px;text-align:center">
+    <p style="margin:0;font-family:Georgia,serif;font-size:14px;color:#e0e7ff;letter-spacing:0.3px">
+      Nueva Cita Registrada en el Sistema
+    </p>
+  </div>
+
+  <!-- CUERPO -->
+  <div style="padding:32px 40px;background:#ffffff">
+
+    <!-- DETALLES DE LA REUNIÓN -->
+    <p style="margin:0 0 12px;font-family:Arial,sans-serif;font-size:11px;font-weight:700;
+              color:#64748b;letter-spacing:1.2px;text-transform:uppercase">
+      Detalles de la reunión
+    </p>
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #4f46e5;
+                border-radius:4px;padding:4px 20px 12px">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        ${row("Tipo de reunión", `<strong>${tipo_encuentro}</strong>`)}
+        ${row("Fecha", `<span style="text-transform:capitalize">${dateStr}</span>`)}
+        ${row("Hora (Colombia)", timeRange)}
+        ${meetRow}
+      </table>
     </div>
-    <div style="padding:32px;background:#fff">
-      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:24px;margin-bottom:24px">
-        <p style="margin:8px 0;color:#0369a1">📋 <strong>Tipo:</strong> ${tipo_encuentro}</p>
-        <p style="margin:8px 0;color:#0369a1">📅 <strong>Fecha:</strong> ${dateStr}</p>
-        <p style="margin:8px 0;color:#0369a1">🕐 <strong>Hora:</strong> ${timeRange} (hora Colombia)</p>
-        ${meetSection}
-      </div>
-      <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:12px;padding:24px;margin-bottom:24px">
-        <h3 style="margin:0 0 16px;color:#111827;font-size:15px">Datos del cliente</h3>
-        <p style="margin:8px 0;color:#374151">🏢 <strong>Empresa:</strong> ${empresa}</p>
-        <p style="margin:8px 0;color:#374151">👥 <strong>Colaboradores:</strong> ${num_colaboradores}</p>
-        <p style="margin:8px 0;color:#374151">🪪 <strong>NIT / Cédula:</strong> ${nit_cedula}</p>
-        <p style="margin:8px 0;color:#374151">📧 <strong>Correo:</strong> ${correo}</p>
-        <p style="margin:8px 0;color:#374151">📱 <strong>Teléfono:</strong> ${telefono}</p>
-        <p style="margin:8px 0;color:#374151">💬 <strong>Motivo:</strong> ${motivo}</p>
-      </div>
+
+    <div style="height:20px"></div>
+
+    <!-- DATOS DEL CLIENTE -->
+    <p style="margin:0 0 12px;font-family:Arial,sans-serif;font-size:11px;font-weight:700;
+              color:#64748b;letter-spacing:1.2px;text-transform:uppercase">
+      Datos del cliente
+    </p>
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #0ea5e9;
+                border-radius:4px;padding:4px 20px 12px">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        ${row("Empresa", `<strong>${empresa}</strong>`)}
+        ${row("Colaboradores", num_colaboradores)}
+        ${row("NIT / Cédula", nit_cedula)}
+        ${row("Correo", `<a href="mailto:${correo}" style="color:#1d4ed8">${correo}</a>`)}
+        ${row("Teléfono", telefono)}
+        ${row("Motivo", motivo)}
+      </table>
     </div>
-    <div style="background:#f9fafb;padding:16px;text-align:center">
-      <p style="color:#9ca3af;font-size:12px;margin:0">© 2025 VisionBI – Uso interno</p>
-    </div>
-  </div>`;
+
+  </div>
+
+  <!-- PIE -->
+  <div style="background:#0f172a;padding:18px 40px;text-align:center">
+    <p style="margin:0;font-family:Arial,sans-serif;font-size:11px;color:#94a3b8">
+      © 2025 VisionBI — Uso interno exclusivo
+    </p>
+  </div>
+
+</div>
+</td></tr>
+</table>
+</body>
+</html>`;
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -320,6 +482,8 @@ serve(async (req) => {
 
     // 5. Preparar datos de formato para los correos
     const resendKey = Deno.env.get("RESEND_API_KEY")!;
+    const siteUrl   = Deno.env.get("SITE_URL") ?? "";
+    const logoUrl   = siteUrl ? `${siteUrl}/logo-visionbi.png` : "";
     const opts: Intl.DateTimeFormatOptions = {
       timeZone: "America/Bogota", weekday: "long", year: "numeric",
       month: "long", day: "numeric",
@@ -346,7 +510,7 @@ serve(async (req) => {
         from:        `VisionBI <${fromEmail}>`,
         to:          [correo],
         subject:     `✅ Cita confirmada: ${tipo_encuentro} – VisionBI`,
-        html:        buildClientEmailHtml(empresa, tipo_encuentro, dateStr, timeRange, meetLink),
+        html:        buildClientEmailHtml(empresa, tipo_encuentro, dateStr, timeRange, meetLink, logoUrl),
         attachments: [icsAttachment],
       }),
     });
@@ -373,7 +537,7 @@ serve(async (req) => {
           html:        buildInternalEmailHtml(
                          empresa, nit_cedula, correo, telefono,
                          num_colaboradores, tipo_encuentro, motivo,
-                         dateStr, timeRange, meetLink
+                         dateStr, timeRange, meetLink, logoUrl
                        ),
           attachments: [icsAttachment],
         }),
