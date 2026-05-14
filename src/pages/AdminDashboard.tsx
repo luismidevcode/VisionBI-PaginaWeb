@@ -8,7 +8,6 @@ import {
   Building2, Phone, Mail, Hash,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge }  from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
 import ClienteModal, { type ClienteRow } from "@/components/admin/ClienteModal";
 import ProyectoModal, { type ProyectoRow } from "@/components/admin/ProyectoModal";
@@ -177,7 +176,7 @@ const AdminDashboard = () => {
         <div className="max-w-6xl mx-auto px-4 h-15 flex items-center justify-between py-3">
           <div className="flex items-center gap-3">
             <img
-              src="/Logo.jpg"
+              src="/logo-visionbi.png"
               alt="VisionBI"
               className="h-8 object-contain brightness-0 invert"
               onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}

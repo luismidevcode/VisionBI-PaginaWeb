@@ -126,7 +126,7 @@ const Dashboard = () => {
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img
-              src="/Logo.jpg"
+              src="/logo-visionbi.png"
               alt="VisionBI"
               className="h-9 object-contain"
               onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
