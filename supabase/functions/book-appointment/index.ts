@@ -17,7 +17,9 @@ function base64url(input: string | Uint8Array): string {
   return str.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
-async function getGoogleAccessToken(): Promise<string> {
+async function getGoogleAccessToken(
+  scopes = "https://www.googleapis.com/auth/calendar"
+): Promise<string> {
   const email = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_EMAIL")!;
   const pem   = Deno.env.get("GOOGLE_PRIVATE_KEY")!.replace(/\\n/g, "\n");
   const now   = Math.floor(Date.now() / 1000);
@@ -25,7 +27,7 @@ async function getGoogleAccessToken(): Promise<string> {
   const header  = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const payload = base64url(JSON.stringify({
     iss:   email,
-    scope: "https://www.googleapis.com/auth/calendar",
+    scope: scopes,
     aud:   "https://oauth2.googleapis.com/token",
     exp:   now + 3600,
     iat:   now,
@@ -239,40 +241,60 @@ serve(async (req) => {
       .select().single();
     if (agendaErr) throw agendaErr;
 
-    // 3. Crear evento en Google Calendar con Google Meet
-    const calendarId  = Deno.env.get("GOOGLE_CALENDAR_ID")!;
-    const accessToken = await getGoogleAccessToken();
+    // 3a. Crear Google Meet space (Meet REST API — funciona con Gmail personal)
+    const meetScopes =
+      "https://www.googleapis.com/auth/calendar " +
+      "https://www.googleapis.com/auth/meetings.space.created";
+    const accessToken = await getGoogleAccessToken(meetScopes);
+
+    let meetLink = "";
+    const meetRes = await fetch("https://meet.googleapis.com/v2/spaces", {
+      method:  "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({}),
+    });
+    const meetData = await meetRes.json();
+    if (meetRes.ok) {
+      meetLink = meetData.meetingUri ?? "";
+      console.log("[Meet] Space creado:", meetLink);
+    } else {
+      console.error("[Meet] Error:", JSON.stringify(meetData));
+    }
+
+    // 3b. Crear evento en Google Calendar (sin conferenceData — incluye Meet en descripción)
+    const calendarId = Deno.env.get("GOOGLE_CALENDAR_ID")!;
+    const calDesc    = [
+      `Empresa: ${empresa}`,
+      `Colaboradores: ${num_colaboradores}`,
+      `NIT/Cédula: ${nit_cedula}`,
+      `Teléfono: ${telefono}`,
+      `Correo: ${correo}`,
+      `Motivo: ${motivo}`,
+      meetLink ? `\nGoogle Meet: ${meetLink}` : "",
+    ].filter(Boolean).join("\n");
 
     const eventRes = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?conferenceDataVersion=1`,
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
       {
         method:  "POST",
         headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           summary:     `${tipo_encuentro} – ${empresa} | VisionBI`,
-          description: `Empresa: ${empresa}\nColaboradores: ${num_colaboradores}\nNIT/Cédula: ${nit_cedula}\nTeléfono: ${telefono}\nCorreo: ${correo}\nMotivo: ${motivo}`,
+          description: calDesc,
+          location:    meetLink || "Google Meet",
           start: { dateTime: fecha_inicio, timeZone: "America/Bogota" },
           end:   { dateTime: fecha_fin,    timeZone: "America/Bogota" },
-          conferenceData: {
-            createRequest: {
-              requestId:            agenda.id,
-              conferenceSolutionKey: { type: "hangoutsMeet" },
-            },
-          },
         }),
       }
     );
     const eventData = await eventRes.json();
 
     let calendarStatus = "ok";
-    let meetLink       = "";
-
     if (!eventRes.ok) {
       calendarStatus = `error ${eventRes.status}: ${JSON.stringify(eventData)}`;
       console.error("[Calendar] Error:", calendarStatus);
     } else {
       console.log("[Calendar] Evento creado:", eventData.id);
-      meetLink = eventData.hangoutLink ?? eventData.conferenceData?.entryPoints?.[0]?.uri ?? "";
       await supabase.from("agendamientos")
         .update({ google_event_id: eventData.id })
         .eq("id", agenda.id);

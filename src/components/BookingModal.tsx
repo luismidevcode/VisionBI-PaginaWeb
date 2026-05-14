@@ -490,7 +490,7 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
                   <FormItem>
                     <FormLabel>Teléfono</FormLabel>
                     <FormControl>
-                      <Input type="tel" placeholder="+57 300 000 0000" {...field} />
+                      <Input type="tel" placeholder="300 000 0000" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
