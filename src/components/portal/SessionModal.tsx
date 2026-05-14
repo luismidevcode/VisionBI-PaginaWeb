@@ -28,7 +28,7 @@ const SESSION_TYPES = [
   "Revisión técnica",
   "Capacitación",
   "Reunión de cierre",
-  "Revisión de requerimientos",
+  "Revisión y aprobación de requerimientos",
 ];
 
 const MIN_DAYS_AHEAD = 7;
