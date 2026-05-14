@@ -69,6 +69,7 @@ const Portal = () => {
   const [error,       setError]       = useState<string | null>(null);
   const [showPass,    setShowPass]    = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [loginSuggestRegister, setLoginSuggestRegister] = useState(false);
 
   // Estado del flujo de registro
   const [regStage,      setRegStage]      = useState<RegStage>("nit");
@@ -99,9 +100,10 @@ const Portal = () => {
 
   // ── Cambio de pestaña ──────────────────────────────────────────────────────
 
-  const handleTabChange = (t: "login" | "register") => {
+  const handleTabChange = (t: "login" | "register", prefillNit?: string) => {
     setTab(t);
     setError(null);
+    setLoginSuggestRegister(false);
     if (t === "register") {
       setRegStage("nit");
       setRegNit("");
@@ -111,6 +113,7 @@ const Portal = () => {
       setShowConfirm(false);
       setPassForm.reset();
       registerForm.reset();
+      if (prefillNit) setRegNit(prefillNit);
     }
   };
 
@@ -119,6 +122,7 @@ const Portal = () => {
   const onLogin = async (values: LoginValues) => {
     setLoading(true);
     setError(null);
+    setLoginSuggestRegister(false);
     try {
       const { data: lookupData, error: lookupError } = await supabase.functions.invoke<{ correo: string }>(
         "lookup-nit",
@@ -133,7 +137,9 @@ const Portal = () => {
         password: values.password,
       });
       if (authError) {
-        setError("Contraseña incorrecta. Intenta de nuevo.");
+        // El cliente existe en la BD pero el login falló: puede que nunca haya creado contraseña
+        setError("Credenciales incorrectas.");
+        setLoginSuggestRegister(true);
         return;
       }
       navigate("/portal/dashboard");
@@ -179,13 +185,12 @@ const Portal = () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: regError } = await supabase.functions.invoke<{ success: boolean }>(
+      const { data } = await supabase.functions.invoke<{ success: boolean; error?: string }>(
         "register-client",
         { body: { mode: "set-password", nit_cedula: regNit, password: values.password } }
       );
-      if (regError || !data?.success) {
-        const msg = (regError as { message?: string })?.message ?? "Error al crear la cuenta.";
-        setError(msg);
+      if (!data?.success) {
+        setError(data?.error ?? "Error al crear la cuenta.");
         return;
       }
       const { error: authError } = await supabase.auth.signInWithPassword({
@@ -211,7 +216,7 @@ const Portal = () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: regError } = await supabase.functions.invoke<{ success: boolean }>(
+      const { data } = await supabase.functions.invoke<{ success: boolean; error?: string }>(
         "register-client",
         {
           body: {
@@ -224,9 +229,8 @@ const Portal = () => {
           },
         }
       );
-      if (regError || !data?.success) {
-        const msg = (regError as { message?: string })?.message ?? "Error al registrarse.";
-        setError(msg);
+      if (!data?.success) {
+        setError(data?.error ?? "Error al registrarse.");
         return;
       }
       const { error: authError } = await supabase.auth.signInWithPassword({
@@ -294,9 +298,20 @@ const Portal = () => {
           <div className="p-7">
 
             {error && (
-              <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 mb-5">
-                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                {error}
+              <div className="flex flex-col gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 mb-5">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  {error}
+                </div>
+                {loginSuggestRegister && (
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange("register", loginForm.getValues("nit_cedula"))}
+                    className="text-left text-[#1a3461] font-semibold underline text-xs"
+                  >
+                    ¿Aún no tienes contraseña? → Ir a Registrarse para crearla
+                  </button>
+                )}
               </div>
             )}
 

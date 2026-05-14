@@ -6,6 +6,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const ok  = (body: object) =>
+  new Response(JSON.stringify(body), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+const fail = (msg: string) =>
+  new Response(JSON.stringify({ success: false, error: msg }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -26,7 +32,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // ── Modo: solo crear contraseña para cliente ya registrado ──────────────
+    // ── Modo: solo contraseña para cliente ya registrado ────────────────────
     if (mode === "set-password") {
       const { data: clienteRow } = await supabase
         .from("clientes")
@@ -34,12 +40,7 @@ serve(async (req) => {
         .eq("nit_cedula", nit_cedula.trim())
         .maybeSingle();
 
-      if (!clienteRow) {
-        return new Response(
-          JSON.stringify({ error: "NIT/Cédula no encontrado." }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      if (!clienteRow) return fail("NIT/Cédula no encontrado.");
 
       const { error: authError } = await supabase.auth.admin.createUser({
         email:         clienteRow.correo,
@@ -50,24 +51,17 @@ serve(async (req) => {
       if (authError) {
         const msg = authError.message.toLowerCase();
         if (msg.includes("already registered") || msg.includes("already been registered")) {
-          return new Response(
-            JSON.stringify({ error: "Ya tienes una cuenta activa. Por favor inicia sesión." }),
-            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          return fail("Ya tienes una cuenta activa. Por favor inicia sesión en la pestaña de inicio de sesión.");
         }
         throw authError;
       }
 
-      return new Response(
-        JSON.stringify({ success: true, correo: clienteRow.correo }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return ok({ success: true, correo: clienteRow.correo });
     }
 
     // ── Modo: registro completo (nuevo cliente) ──────────────────────────────
     const { empresa, correo, telefono, num_colaboradores } = body;
 
-    // Si el NIT ya existe con otro correo, rechazar
     const { data: existingByNit } = await supabase
       .from("clientes")
       .select("correo")
@@ -75,10 +69,7 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existingByNit && existingByNit.correo !== correo) {
-      return new Response(
-        JSON.stringify({ error: "Este NIT/Cédula ya está registrado con otro correo electrónico." }),
-        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return fail("Este NIT/Cédula ya está registrado. Si eres tú, ingresa tu correo original o inicia sesión.");
     }
 
     const { error: authError } = await supabase.auth.admin.createUser({
@@ -90,10 +81,7 @@ serve(async (req) => {
     if (authError) {
       const msg = authError.message.toLowerCase();
       if (msg.includes("already registered") || msg.includes("already been registered")) {
-        return new Response(
-          JSON.stringify({ error: "Este correo ya tiene una cuenta. Por favor inicia sesión." }),
-          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return fail("Este correo ya tiene una cuenta activa. Por favor inicia sesión.");
       }
       throw authError;
     }
@@ -113,13 +101,10 @@ serve(async (req) => {
       );
     if (clienteError) throw clienteError;
 
-    return new Response(
-      JSON.stringify({ success: true }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return ok({ success: true });
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ success: false, error: "Error interno del servidor. Intenta de nuevo." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
