@@ -265,7 +265,7 @@ const Portal = () => {
         {/* Logo */}
         <div className="text-center mb-8">
           <img
-            src="/Logo.png"
+            src="/Logo.jpg"
             alt="VisionBI"
             className="h-16 mx-auto object-contain mb-3"
             onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
