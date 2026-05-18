@@ -409,7 +409,7 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
                         {meetingType}
                       </div>
                     ) : (
-                      <Select modal={false} onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecciona el tipo de encuentro" />
@@ -449,7 +449,7 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Número de colaboradores</FormLabel>
-                    <Select modal={false} onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecciona el rango" />
