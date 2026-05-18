@@ -298,7 +298,7 @@ const SessionModal = ({ open, onClose, proyectoId, projectName }: SessionModalPr
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tipo de sesión</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select modal={false} onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecciona el tipo de sesión" />

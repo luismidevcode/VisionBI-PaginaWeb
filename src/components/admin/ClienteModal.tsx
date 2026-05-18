@@ -147,7 +147,7 @@ const ClienteModal = ({ open, onClose, cliente, onSaved }: Props) => {
             <FormField control={form.control} name="num_colaboradores" render={({ field }) => (
               <FormItem>
                 <FormLabel>Colaboradores</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                <Select modal={false} onValueChange={field.onChange} value={field.value ?? ""}>
                   <FormControl>
                     <SelectTrigger><SelectValue placeholder="Selecciona el rango" /></SelectTrigger>
                   </FormControl>

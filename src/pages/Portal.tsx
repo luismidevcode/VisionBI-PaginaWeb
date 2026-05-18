@@ -564,7 +564,7 @@ const Portal = () => {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Número de colaboradores</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
+                            <Select modal={false} onValueChange={field.onChange} value={field.value}>
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Selecciona el rango" />
