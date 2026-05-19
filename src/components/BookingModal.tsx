@@ -33,13 +33,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -287,15 +280,7 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent
-        className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto"
-        onPointerDownOutside={(e) => {
-          const t = e.target as HTMLElement;
-          if (t?.closest?.('[role="listbox"]') || t?.closest?.('[role="option"]')) {
-            e.preventDefault();
-          }
-        }}
-      >
+      <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
 
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">
@@ -417,18 +402,18 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
                         {meetingType}
                       </div>
                     ) : (
-                      <Select modal={false} onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona el tipo de encuentro" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
+                      <FormControl>
+                        <select
+                          value={field.value}
+                          onChange={(e) => field.onChange(e.target.value)}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <option value="">Selecciona el tipo de encuentro</option>
                           {MEETING_TYPES.map((t) => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                            <option key={t} value={t}>{t}</option>
                           ))}
-                        </SelectContent>
-                      </Select>
+                        </select>
+                      </FormControl>
                     )}
                     <FormMessage />
                   </FormItem>
@@ -457,18 +442,18 @@ const BookingModal = ({ open, onClose, meetingType }: BookingModalProps) => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Número de colaboradores</FormLabel>
-                    <Select modal={false} onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona el rango" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
+                    <FormControl>
+                      <select
+                        value={field.value}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="">Selecciona el rango</option>
                         {COLABORADORES_OPTIONS.map((opt) => (
-                          <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                          <option key={opt} value={opt}>{opt}</option>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </select>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
