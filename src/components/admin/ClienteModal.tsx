@@ -141,24 +141,26 @@ const ClienteModal = ({ open, onClose, cliente, onSaved }: Props) => {
               </FormItem>
             )} />
 
-            <FormField control={form.control} name="num_colaboradores" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Colaboradores</FormLabel>
-                <FormControl>
-                  <select
-                    value={field.value ?? ""}
-                    onChange={(e) => field.onChange(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="">Selecciona el rango</option>
-                    {COLABORADORES_OPTIONS.map((o) => (
-                      <option key={o} value={o}>{o}</option>
-                    ))}
-                  </select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+            {!isEdit && (
+              <FormField control={form.control} name="num_colaboradores" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Colaboradores</FormLabel>
+                  <FormControl>
+                    <select
+                      value={field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="">Selecciona el rango</option>
+                      {COLABORADORES_OPTIONS.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
 
             <div className="flex gap-3 pt-2">
               <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
