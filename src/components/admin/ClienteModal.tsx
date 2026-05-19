@@ -92,7 +92,15 @@ const ClienteModal = ({ open, onClose, cliente, onSaved }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[460px]">
+      <DialogContent
+          className="sm:max-w-[460px]"
+          onPointerDownOutside={(e) => {
+            const t = e.target as HTMLElement;
+            if (t?.closest?.('[role="listbox"]') || t?.closest?.('[role="option"]')) {
+              e.preventDefault();
+            }
+          }}
+        >
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar cliente" : "Nuevo cliente"}</DialogTitle>
         </DialogHeader>
@@ -147,7 +155,7 @@ const ClienteModal = ({ open, onClose, cliente, onSaved }: Props) => {
             <FormField control={form.control} name="num_colaboradores" render={({ field }) => (
               <FormItem>
                 <FormLabel>Colaboradores</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                <Select modal={false} onValueChange={field.onChange} value={field.value ?? ""}>
                   <FormControl>
                     <SelectTrigger><SelectValue placeholder="Selecciona el rango" /></SelectTrigger>
                   </FormControl>

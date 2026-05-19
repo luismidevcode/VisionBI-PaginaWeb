@@ -193,7 +193,15 @@ const SessionModal = ({ open, onClose, proyectoId, projectName }: SessionModalPr
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(e) => {
+          const t = e.target as HTMLElement;
+          if (t?.closest?.('[role="listbox"]') || t?.closest?.('[role="option"]')) {
+            e.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">
             {step === 3 ? (
@@ -298,7 +306,7 @@ const SessionModal = ({ open, onClose, proyectoId, projectName }: SessionModalPr
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tipo de sesión</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select modal={false} onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecciona el tipo de sesión" />
