@@ -59,7 +59,7 @@ const COLABORADORES_OPTIONS = [
   "Más de 500",
 ];
 
-const MIN_DAYS_AHEAD = 7;
+const MIN_DAYS_AHEAD = 1;
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 

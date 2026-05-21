@@ -6,11 +6,17 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const WORKING_START = 9;   // 9 AM Bogotá
-const WORKING_END   = 18;  // 6 PM Bogotá
-const LUNCH_HOUR    = 12;  // 12:00-13:00 excluido
-const BOGOTA_TZ     = "-05:00";
-const MIN_DAYS_AHEAD = 7;  // reservas mínimo 7 días en adelante
+const WORKING_START_MIN  = 12 * 60 + 30; // 12:30 Bogotá (en minutos desde medianoche)
+const WORKING_END_MIN    = 18 * 60;      // 18:00 Bogotá
+const SLOT_DURATION_MIN  = 60;           // ciclos de 1 hora
+const BOGOTA_TZ          = "-05:00";
+const MIN_DAYS_AHEAD     = 1;            // reservas mínimo 1 día en adelante
+
+function minToTimeStr(totalMin: number): string {
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`;
+}
 
 // ─── Google Auth ──────────────────────────────────────────────────────────────
 
@@ -82,10 +88,9 @@ function isFree(
 }
 
 function dayHasSlots(dateStr: string, busy: { start: string; end: string }[]): boolean {
-  for (let h = WORKING_START; h < WORKING_END; h++) {
-    if (h === LUNCH_HOUR) continue;
-    const sMs = new Date(`${dateStr}T${String(h).padStart(2, "0")}:00:00${BOGOTA_TZ}`).getTime();
-    const eMs = new Date(`${dateStr}T${String(h + 1).padStart(2, "0")}:00:00${BOGOTA_TZ}`).getTime();
+  for (let m = WORKING_START_MIN; m + SLOT_DURATION_MIN <= WORKING_END_MIN; m += SLOT_DURATION_MIN) {
+    const sMs = new Date(`${dateStr}T${minToTimeStr(m)}${BOGOTA_TZ}`).getTime();
+    const eMs = new Date(`${dateStr}T${minToTimeStr(m + SLOT_DURATION_MIN)}${BOGOTA_TZ}`).getTime();
     if (isFree(sMs, eMs, busy)) return true;
   }
   return false;
@@ -133,8 +138,8 @@ serve(async (req) => {
       }
 
       // Una sola consulta freebusy para todo el mes
-      const timeMin = `${workingDays[0]}T${String(WORKING_START).padStart(2, "0")}:00:00${BOGOTA_TZ}`;
-      const timeMax = `${workingDays[workingDays.length - 1]}T${String(WORKING_END).padStart(2, "0")}:00:00${BOGOTA_TZ}`;
+      const timeMin = `${workingDays[0]}T${minToTimeStr(WORKING_START_MIN)}${BOGOTA_TZ}`;
+      const timeMax = `${workingDays[workingDays.length - 1]}T${minToTimeStr(WORKING_END_MIN)}${BOGOTA_TZ}`;
 
       const fbRes  = await fetch("https://www.googleapis.com/calendar/v3/freeBusy", {
         method:  "POST",
@@ -164,11 +169,10 @@ serve(async (req) => {
       });
 
     const allSlots: { start: string; end: string }[] = [];
-    for (let h = WORKING_START; h < WORKING_END; h++) {
-      if (h === LUNCH_HOUR) continue;
+    for (let m = WORKING_START_MIN; m + SLOT_DURATION_MIN <= WORKING_END_MIN; m += SLOT_DURATION_MIN) {
       allSlots.push({
-        start: `${date}T${String(h).padStart(2, "0")}:00:00${BOGOTA_TZ}`,
-        end:   `${date}T${String(h + 1).padStart(2, "0")}:00:00${BOGOTA_TZ}`,
+        start: `${date}T${minToTimeStr(m)}${BOGOTA_TZ}`,
+        end:   `${date}T${minToTimeStr(m + SLOT_DURATION_MIN)}${BOGOTA_TZ}`,
       });
     }
 

@@ -31,7 +31,7 @@ const SESSION_TYPES = [
   "Revisión y aprobación de requerimientos",
 ];
 
-const MIN_DAYS_AHEAD = 7;
+const MIN_DAYS_AHEAD = 1;
 
 interface Slot { start: string; end: string; }
 
