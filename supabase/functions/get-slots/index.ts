@@ -6,8 +6,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const WORKING_START_MIN  = 12 * 60 + 30; // 12:30 Bogotá (en minutos desde medianoche)
-const WORKING_END_MIN    = 18 * 60;      // 18:00 Bogotá
+const WORKING_START_MIN  = 10 * 60 + 30; // 10:30 Bogotá (en minutos desde medianoche)
+const WORKING_END_MIN    = 18 * 60 + 30; // 18:30 Bogotá
 const SLOT_DURATION_MIN  = 60;           // ciclos de 1 hora
 const BOGOTA_TZ          = "-05:00";
 const MIN_DAYS_AHEAD     = 1;            // reservas mínimo 1 día en adelante
