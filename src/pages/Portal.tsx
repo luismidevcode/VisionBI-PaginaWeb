@@ -10,9 +10,6 @@ import { Label }    from "@/components/ui/label";
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -564,18 +561,18 @@ const Portal = () => {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Número de colaboradores</FormLabel>
-                            <Select modal={false} onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecciona el rango" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
+                            <FormControl>
+                              <select
+                                value={field.value}
+                                onChange={(e) => field.onChange(e.target.value)}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <option value="">Selecciona el rango</option>
                                 {COLABORADORES_OPTIONS.map((opt) => (
-                                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                  <option key={opt} value={opt}>{opt}</option>
                                 ))}
-                              </SelectContent>
-                            </Select>
+                              </select>
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}

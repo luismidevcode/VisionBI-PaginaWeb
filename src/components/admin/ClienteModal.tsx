@@ -8,9 +8,6 @@ import {
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input }  from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
@@ -92,15 +89,7 @@ const ClienteModal = ({ open, onClose, cliente, onSaved }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent
-          className="sm:max-w-[460px]"
-          onPointerDownOutside={(e) => {
-            const t = e.target as HTMLElement;
-            if (t?.closest?.('[role="listbox"]') || t?.closest?.('[role="option"]')) {
-              e.preventDefault();
-            }
-          }}
-        >
+      <DialogContent className="sm:max-w-[460px]">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar cliente" : "Nuevo cliente"}</DialogTitle>
         </DialogHeader>
@@ -152,22 +141,26 @@ const ClienteModal = ({ open, onClose, cliente, onSaved }: Props) => {
               </FormItem>
             )} />
 
-            <FormField control={form.control} name="num_colaboradores" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Colaboradores</FormLabel>
-                <Select modal={false} onValueChange={field.onChange} value={field.value ?? ""}>
+            {!isEdit && (
+              <FormField control={form.control} name="num_colaboradores" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Colaboradores</FormLabel>
                   <FormControl>
-                    <SelectTrigger><SelectValue placeholder="Selecciona el rango" /></SelectTrigger>
+                    <select
+                      value={field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="">Selecciona el rango</option>
+                      {COLABORADORES_OPTIONS.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
                   </FormControl>
-                  <SelectContent>
-                    {COLABORADORES_OPTIONS.map((o) => (
-                      <SelectItem key={o} value={o}>{o}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )} />
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
 
             <div className="flex gap-3 pt-2">
               <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
