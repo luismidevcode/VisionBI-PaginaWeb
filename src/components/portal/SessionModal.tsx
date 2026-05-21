@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useForm }         from "react-hook-form";
 import { zodResolver }     from "@hookform/resolvers/zod";
 import { z }               from "zod";
-import { format, isSaturday, isSunday } from "date-fns";
+import { format, isSunday } from "date-fns";
 import { es }              from "date-fns/locale";
 import {
   Calendar as CalendarIcon, Clock, CheckCircle2,
@@ -112,7 +112,7 @@ const SessionModal = ({ open, onClose, proyectoId, projectName }: SessionModalPr
   }, [open, fetchAvailableDays]);
 
   const isDisabled = useCallback((date: Date): boolean => {
-    if (date < minBookableDate() || isSaturday(date) || isSunday(date)) return true;
+    if (date < minBookableDate() || isSunday(date)) return true;
     if (daysLoaded) return !availableDays.has(format(date, "yyyy-MM-dd"));
     return false;
   }, [availableDays, daysLoaded]);

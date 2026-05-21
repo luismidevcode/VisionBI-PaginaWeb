@@ -7,7 +7,8 @@ const corsHeaders = {
 };
 
 const WORKING_START_MIN  = 10 * 60 + 30; // 10:30 Bogotá (en minutos desde medianoche)
-const WORKING_END_MIN    = 18 * 60 + 30; // 18:30 Bogotá
+const WORKING_END_MIN    = 18 * 60 + 30; // 18:30 Bogotá (L-V)
+const SATURDAY_END_MIN   = 12 * 60 + 30; // 12:30 Bogotá (sábados)
 const SLOT_DURATION_MIN  = 60;           // ciclos de 1 hora
 const BOGOTA_TZ          = "-05:00";
 const MIN_DAYS_AHEAD     = 1;            // reservas mínimo 1 día en adelante
@@ -16,6 +17,11 @@ function minToTimeStr(totalMin: number): string {
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`;
+}
+
+function effectiveEndMin(dateStr: string): number {
+  const dow = new Date(`${dateStr}T12:00:00${BOGOTA_TZ}`).getDay();
+  return dow === 6 ? SATURDAY_END_MIN : WORKING_END_MIN;
 }
 
 // ─── Google Auth ──────────────────────────────────────────────────────────────
@@ -88,7 +94,7 @@ function isFree(
 }
 
 function dayHasSlots(dateStr: string, busy: { start: string; end: string }[]): boolean {
-  for (let m = WORKING_START_MIN; m + SLOT_DURATION_MIN <= WORKING_END_MIN; m += SLOT_DURATION_MIN) {
+  for (let m = WORKING_START_MIN; m + SLOT_DURATION_MIN <= effectiveEndMin(dateStr); m += SLOT_DURATION_MIN) {
     const sMs = new Date(`${dateStr}T${minToTimeStr(m)}${BOGOTA_TZ}`).getTime();
     const eMs = new Date(`${dateStr}T${minToTimeStr(m + SLOT_DURATION_MIN)}${BOGOTA_TZ}`).getTime();
     if (isFree(sMs, eMs, busy)) return true;
@@ -123,7 +129,7 @@ serve(async (req) => {
       const cur = new Date(Math.max(firstOfMonth.getTime(), minDate.getTime()));
       while (cur <= lastOfMonth) {
         const dow = cur.getDay();
-        if (dow !== 0 && dow !== 6) {
+        if (dow !== 0) {
           const mm = String(cur.getMonth() + 1).padStart(2, "0");
           const dd = String(cur.getDate()).padStart(2, "0");
           workingDays.push(`${cur.getFullYear()}-${mm}-${dd}`);
@@ -169,7 +175,7 @@ serve(async (req) => {
       });
 
     const allSlots: { start: string; end: string }[] = [];
-    for (let m = WORKING_START_MIN; m + SLOT_DURATION_MIN <= WORKING_END_MIN; m += SLOT_DURATION_MIN) {
+    for (let m = WORKING_START_MIN; m + SLOT_DURATION_MIN <= effectiveEndMin(date); m += SLOT_DURATION_MIN) {
       allSlots.push({
         start: `${date}T${minToTimeStr(m)}${BOGOTA_TZ}`,
         end:   `${date}T${minToTimeStr(m + SLOT_DURATION_MIN)}${BOGOTA_TZ}`,
