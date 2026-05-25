@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate }         from "react-router-dom";
 import {
   LogOut, CalendarPlus, FolderOpen, User, Save,
-  AlertCircle, CheckCircle2, Pencil, Shield,
+  AlertCircle, CheckCircle2, Pencil, Shield, Users,
+  Check, X, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
@@ -14,6 +15,18 @@ import SessionModal from "@/components/portal/SessionModal";
 
 interface EmpresaUsuario {
   role:              string;
+  can_book_sessions: boolean;
+  can_view_projects: boolean;
+  can_view_sessions: boolean;
+  can_edit_company:  boolean;
+}
+
+interface EmpresaUsuarioRow {
+  id:                string;
+  user_id:           string;
+  correo_usuario:    string;
+  role:              string;
+  status:            string;
   can_book_sessions: boolean;
   can_view_projects: boolean;
   can_view_sessions: boolean;
@@ -51,7 +64,7 @@ const Dashboard = () => {
   const [cliente,       setCliente]       = useState<Cliente | null>(null);
   const [proyectos,     setProyectos]     = useState<Proyecto[]>([]);
   const [loading,       setLoading]       = useState(true);
-  const [activeTab,     setActiveTab]     = useState<"proyectos" | "perfil">("proyectos");
+  const [activeTab,     setActiveTab]     = useState<"proyectos" | "usuarios" | "perfil">("proyectos");
   const [sessionModal,  setSessionModal]  = useState<{ open: boolean; proyecto: Proyecto | null }>({
     open: false, proyecto: null,
   });
@@ -61,6 +74,11 @@ const Dashboard = () => {
   const [profileForm,   setProfileForm]   = useState({ empresa: "", telefono: "" });
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg,    setProfileMsg]    = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  // Gestión de usuarios (owner)
+  const [usuarios,      setUsuarios]      = useState<EmpresaUsuarioRow[]>([]);
+  const [expandedUser,  setExpandedUser]  = useState<string | null>(null);
+  const [savingUser,    setSavingUser]    = useState<string | null>(null);
 
   // ── Cargar datos ────────────────────────────────────────────────────────────
 
@@ -102,6 +120,16 @@ const Dashboard = () => {
         setProyectos(proy ?? []);
       }
 
+      // Usuarios de la empresa (solo owner/manager)
+      if (euData.role === "owner" || euData.role === "manager") {
+        const { data: usrs } = await supabase
+          .from("empresa_usuarios")
+          .select("id, user_id, correo_usuario, role, status, can_book_sessions, can_view_projects, can_view_sessions, can_edit_company")
+          .eq("cliente_id", cl.id)
+          .order("created_at", { ascending: true });
+        setUsuarios(usrs ?? []);
+      }
+
       setLoading(false);
     };
     load();
@@ -141,6 +169,26 @@ const Dashboard = () => {
     }
   };
 
+  // ── Gestión de usuarios ─────────────────────────────────────────────────────
+
+  const updateUsuario = async (id: string, changes: Partial<EmpresaUsuarioRow>) => {
+    setSavingUser(id);
+    const { error } = await supabase
+      .from("empresa_usuarios")
+      .update({ ...changes, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (!error) {
+      setUsuarios((prev) => prev.map((u) => u.id === id ? { ...u, ...changes } : u));
+    }
+    setSavingUser(null);
+  };
+
+  const aprobarUsuario = (id: string) =>
+    updateUsuario(id, { status: "active" });
+
+  const rechazarUsuario = (id: string) =>
+    updateUsuario(id, { status: "disabled" });
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -151,9 +199,12 @@ const Dashboard = () => {
     );
   }
 
+  const pendingCount = usuarios.filter((u) => u.status === "pending").length;
+
   const tabs = [
-    ...(eu?.can_view_projects ? [{ key: "proyectos" as const, label: "Mis proyectos", icon: FolderOpen }] : []),
-    { key: "perfil" as const, label: "Mi perfil", icon: User },
+    ...(eu?.can_view_projects ? [{ key: "proyectos" as const, label: "Mis proyectos", icon: FolderOpen, badge: 0 }] : []),
+    ...((eu?.role === "owner" || eu?.role === "manager") ? [{ key: "usuarios" as const, label: "Usuarios", icon: Users, badge: pendingCount }] : []),
+    { key: "perfil" as const, label: "Mi perfil", icon: User, badge: 0 },
   ];
 
   return (
@@ -193,7 +244,7 @@ const Dashboard = () => {
       {/* Nav tabs */}
       <div className="bg-white border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-4 flex gap-1">
-          {tabs.map(({ key, label, icon: Icon }) => (
+          {tabs.map(({ key, label, icon: Icon, badge }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
@@ -204,6 +255,11 @@ const Dashboard = () => {
               }`}
             >
               <Icon className="h-4 w-4" /> {label}
+              {badge > 0 && (
+                <span className="bg-orange-500 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center leading-none">
+                  {badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -253,6 +309,162 @@ const Dashboard = () => {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Usuarios ── */}
+        {activeTab === "usuarios" && (eu?.role === "owner" || eu?.role === "manager") && (
+          <div>
+            <h2 className="text-lg font-bold text-[#1a3461] mb-6">Usuarios de la empresa</h2>
+
+            {/* Pendientes */}
+            {usuarios.filter((u) => u.status === "pending").length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-sm font-semibold text-orange-600 uppercase tracking-wide mb-3">
+                  Solicitudes pendientes
+                </h3>
+                <div className="space-y-3">
+                  {usuarios.filter((u) => u.status === "pending").map((u) => (
+                    <div key={u.id} className="bg-white rounded-xl border border-orange-200 p-4 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">{u.correo_usuario}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Solicita acceso como {ROLE_LABELS[u.role] ?? u.role}</p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white gap-1.5 h-8"
+                          disabled={savingUser === u.id}
+                          onClick={() => aprobarUsuario(u.id)}
+                        >
+                          <Check className="h-3.5 w-3.5" /> Aprobar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-red-300 text-red-600 hover:bg-red-50 gap-1.5 h-8"
+                          disabled={savingUser === u.id}
+                          onClick={() => rechazarUsuario(u.id)}
+                        >
+                          <X className="h-3.5 w-3.5" /> Rechazar
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Activos */}
+            <div>
+              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                Usuarios activos
+              </h3>
+              <div className="space-y-2">
+                {usuarios.filter((u) => u.status === "active").map((u) => (
+                  <div key={u.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                    <button
+                      className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-50 transition-colors"
+                      onClick={() => setExpandedUser(expandedUser === u.id ? null : u.id)}
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">{u.correo_usuario}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{ROLE_LABELS[u.role] ?? u.role}</p>
+                      </div>
+                      {expandedUser === u.id
+                        ? <ChevronUp className="h-4 w-4 text-slate-400" />
+                        : <ChevronDown className="h-4 w-4 text-slate-400" />
+                      }
+                    </button>
+
+                    {expandedUser === u.id && (
+                      <div className="border-t border-slate-100 p-4 space-y-4 bg-slate-50">
+                        {/* Rol */}
+                        <div>
+                          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">Rol</Label>
+                          <select
+                            value={u.role}
+                            onChange={(e) => updateUsuario(u.id, { role: e.target.value })}
+                            disabled={savingUser === u.id}
+                            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white w-full max-w-xs"
+                          >
+                            <option value="owner">Owner</option>
+                            <option value="manager">Manager</option>
+                            <option value="analista">Analista</option>
+                            <option value="viewer">Viewer</option>
+                          </select>
+                        </div>
+
+                        {/* Permisos */}
+                        <div>
+                          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 block">Permisos</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {([
+                              ["can_book_sessions", "Reservar sesiones"],
+                              ["can_view_projects", "Ver proyectos"],
+                              ["can_view_sessions", "Ver sesiones"],
+                              ["can_edit_company",  "Editar empresa"],
+                            ] as [keyof EmpresaUsuarioRow, string][]).map(([key, label]) => (
+                              <label key={key} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={!!u[key]}
+                                  disabled={savingUser === u.id}
+                                  onChange={(e) => updateUsuario(u.id, { [key]: e.target.checked })}
+                                  className="rounded"
+                                />
+                                {label}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Deshabilitar */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-red-300 text-red-600 hover:bg-red-50"
+                          disabled={savingUser === u.id}
+                          onClick={() => updateUsuario(u.id, { status: "disabled" })}
+                        >
+                          Deshabilitar usuario
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {usuarios.filter((u) => u.status === "active").length === 0 && (
+                  <p className="text-sm text-slate-400 py-4 text-center">No hay usuarios activos.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Deshabilitados */}
+            {usuarios.filter((u) => u.status === "disabled").length > 0 && (
+              <div className="mt-8">
+                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Deshabilitados</h3>
+                <div className="space-y-2">
+                  {usuarios.filter((u) => u.status === "disabled").map((u) => (
+                    <div key={u.id} className="bg-white rounded-xl border border-slate-100 p-4 flex items-center justify-between gap-4 opacity-60">
+                      <div>
+                        <p className="text-sm font-medium text-slate-600">{u.correo_usuario}</p>
+                        <p className="text-xs text-slate-400">{ROLE_LABELS[u.role] ?? u.role}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        disabled={savingUser === u.id}
+                        onClick={() => aprobarUsuario(u.id)}
+                      >
+                        Reactivar
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
