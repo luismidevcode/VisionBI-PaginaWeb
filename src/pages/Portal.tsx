@@ -98,11 +98,16 @@ const Portal = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setError("Error al iniciar sesión."); return; }
 
-      const { data: eu } = await supabase
+      const { data: eu, error: euError } = await supabase
         .from("empresa_usuarios")
         .select("status")
         .eq("user_id", session.user.id)
         .maybeSingle();
+
+      if (euError) {
+        console.error("[Portal] empresa_usuarios query error:", euError);
+      }
+      console.log("[Portal] empresa_usuarios row:", eu, "uid:", session.user.id);
 
       if (!eu) {
         await supabase.auth.signOut();
