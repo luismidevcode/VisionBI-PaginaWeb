@@ -3,7 +3,7 @@ import { useNavigate }         from "react-router-dom";
 import {
   LogOut, CalendarPlus, FolderOpen, User, Save,
   AlertCircle, CheckCircle2, Pencil, Shield, Users,
-  Check, X, ChevronDown, ChevronUp,
+  Check, X, ChevronDown, ChevronUp, CalendarClock, ExternalLink,
 } from "lucide-react";
 import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
@@ -48,6 +48,17 @@ interface Proyecto {
   estado:      string;
 }
 
+interface Sesion {
+  id:          string;
+  tipo_sesion: string;
+  motivo:      string | null;
+  fecha_inicio: string;
+  fecha_fin:    string;
+  meet_link:    string | null;
+  estado:       string;
+  proyecto:     { nombre: string } | null;
+}
+
 const ROLE_LABELS: Record<string, string> = {
   owner:    "Owner",
   manager:  "Manager",
@@ -64,7 +75,8 @@ const Dashboard = () => {
   const [cliente,       setCliente]       = useState<Cliente | null>(null);
   const [proyectos,     setProyectos]     = useState<Proyecto[]>([]);
   const [loading,       setLoading]       = useState(true);
-  const [activeTab,     setActiveTab]     = useState<"proyectos" | "usuarios" | "perfil">("proyectos");
+  const [activeTab,     setActiveTab]     = useState<"proyectos" | "sesiones" | "usuarios" | "perfil">("proyectos");
+  const [sesiones,      setSesiones]      = useState<Sesion[]>([]);
   const [sessionModal,  setSessionModal]  = useState<{ open: boolean; proyecto: Proyecto | null }>({
     open: false, proyecto: null,
   });
@@ -118,6 +130,15 @@ const Dashboard = () => {
           .eq("estado", "activo")
           .order("created_at", { ascending: false });
         setProyectos(proy ?? []);
+      }
+
+      // Sesiones (solo si tiene permiso)
+      if (euData.can_view_sessions) {
+        const { data: sess } = await supabase
+          .from("sesiones_proyecto")
+          .select("id, tipo_sesion, motivo, fecha_inicio, fecha_fin, meet_link, estado, proyecto:proyectos(nombre)")
+          .order("fecha_inicio", { ascending: false });
+        setSesiones((sess as Sesion[]) ?? []);
       }
 
       // Usuarios de la empresa (solo owner/manager)
@@ -202,7 +223,8 @@ const Dashboard = () => {
   const pendingCount = usuarios.filter((u) => u.status === "pending").length;
 
   const tabs = [
-    ...(eu?.can_view_projects ? [{ key: "proyectos" as const, label: "Mis proyectos", icon: FolderOpen, badge: 0 }] : []),
+    ...(eu?.can_view_projects  ? [{ key: "proyectos" as const, label: "Mis proyectos", icon: FolderOpen,    badge: 0 }] : []),
+    ...(eu?.can_view_sessions  ? [{ key: "sesiones"  as const, label: "Sesiones",      icon: CalendarClock, badge: 0 }] : []),
     ...((eu?.role === "owner" || eu?.role === "manager") ? [{ key: "usuarios" as const, label: "Usuarios", icon: Users, badge: pendingCount }] : []),
     { key: "perfil" as const, label: "Mi perfil", icon: User, badge: 0 },
   ];
@@ -309,6 +331,97 @@ const Dashboard = () => {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Sesiones ── */}
+        {activeTab === "sesiones" && eu?.can_view_sessions && (
+          <div>
+            <h2 className="text-lg font-bold text-[#1a3461] mb-6">Sesiones agendadas</h2>
+
+            {sesiones.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-xl border border-slate-200">
+                <CalendarClock className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500 font-medium">No hay sesiones registradas</p>
+                <p className="text-slate-400 text-sm mt-1">Las sesiones agendadas aparecerán aquí.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sesiones.map((s) => {
+                  const inicio  = new Date(s.fecha_inicio);
+                  const fin     = new Date(s.fecha_fin);
+                  const now     = new Date();
+                  const isPast  = fin < now;
+                  const isToday = inicio.toDateString() === now.toDateString();
+
+                  return (
+                    <div
+                      key={s.id}
+                      className={`bg-white rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center gap-4 ${
+                        isPast ? "border-slate-100 opacity-70" : isToday ? "border-[#00b8d9]" : "border-slate-200"
+                      }`}
+                    >
+                      {/* Fecha */}
+                      <div className="shrink-0 text-center bg-slate-50 rounded-lg px-4 py-3 min-w-[80px]">
+                        <p className="text-xs text-slate-400 uppercase font-medium">
+                          {inicio.toLocaleDateString("es-CO", { month: "short" })}
+                        </p>
+                        <p className="text-2xl font-bold text-[#1a3461] leading-tight">
+                          {inicio.getDate()}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {inicio.toLocaleDateString("es-CO", { year: "numeric" })}
+                        </p>
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-slate-800">{s.tipo_sesion}</p>
+                          <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${
+                            s.estado === "confirmada"
+                              ? "bg-green-50 text-green-700 border border-green-200"
+                              : s.estado === "cancelada"
+                              ? "bg-red-50 text-red-700 border border-red-200"
+                              : "bg-slate-100 text-slate-600"
+                          }`}>
+                            {s.estado}
+                          </span>
+                          {isToday && (
+                            <span className="text-xs font-medium bg-[#00b8d9]/10 text-[#00b8d9] border border-[#00b8d9]/30 rounded-full px-2 py-0.5">
+                              Hoy
+                            </span>
+                          )}
+                        </div>
+                        {s.proyecto && (
+                          <p className="text-xs text-slate-400 mt-0.5">{s.proyecto.nombre}</p>
+                        )}
+                        <p className="text-xs text-slate-500 mt-1">
+                          {inicio.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
+                          {" – "}
+                          {fin.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                        {s.motivo && (
+                          <p className="text-xs text-slate-500 mt-1 truncate">{s.motivo}</p>
+                        )}
+                      </div>
+
+                      {/* Meet link */}
+                      {s.meet_link && !isPast && (
+                        <a
+                          href={s.meet_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="shrink-0 flex items-center gap-1.5 text-sm font-medium text-[#00b8d9] hover:text-[#0099b8] border border-[#00b8d9]/40 rounded-lg px-3 py-2 hover:bg-[#00b8d9]/5 transition-colors"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" /> Unirse
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
