@@ -144,17 +144,13 @@ const Portal = () => {
     setRegChecking(true);
     setRegNitError(null);
     try {
-      const { data } = await supabase
-        .from("clientes")
-        .select("empresa")
-        .eq("nit_cedula", nit)
-        .maybeSingle();
+      const { data: empresa } = await supabase.rpc("check_nit", { p_nit: nit });
 
-      if (!data) {
+      if (!empresa) {
         setRegNitError("NIT/Cédula no encontrado. Tu empresa debe estar registrada en VisionBI primero.");
         return;
       }
-      setRegEmpresa(data.empresa);
+      setRegEmpresa(empresa);
       setRegStage("data");
     } catch {
       setRegNitError("Error al verificar. Intenta de nuevo.");
