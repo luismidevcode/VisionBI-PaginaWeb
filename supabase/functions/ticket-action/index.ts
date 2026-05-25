@@ -13,7 +13,7 @@ const fail = (msg: string, status = 400) =>
 
 // ── State machine (mirrors src/lib/ticketStateMachine.ts) ─────────────────────
 
-type Estado    = "abierto" | "en_progreso" | "resuelto" | "cerrado";
+type Estado     = "abierto" | "en_progreso" | "resuelto" | "cerrado";
 type QuienPuede = "asignado" | "creador_o_admin";
 
 const TRANSICIONES: Record<Estado, { to: Estado; quien: QuienPuede }[]> = {
@@ -38,6 +38,160 @@ function puedeTransicionar(
       return { permitido: false, razon: "Solo el creador o un administrador puede cerrar el ticket." };
   }
   return { permitido: true };
+}
+
+// ── Email templates ───────────────────────────────────────────────────────────
+
+const ESTADO_BADGE: Record<string, string> = {
+  abierto:     "background:#fef9c3;color:#854d0e",
+  en_progreso: "background:#dbeafe;color:#1d4ed8",
+  resuelto:    "background:#dcfce7;color:#15803d",
+  cerrado:     "background:#f1f5f9;color:#475569",
+};
+
+const ESTADO_LABEL: Record<string, string> = {
+  abierto:     "Abierto",
+  en_progreso: "En progreso",
+  resuelto:    "Resuelto",
+  cerrado:     "Cerrado",
+};
+
+function layout(bandaTitle: string, content: string, logoUrl: string): string {
+  const logoImg = logoUrl
+    ? `<img src="${logoUrl}" alt="VisionBI" height="56"
+            style="display:block;height:56px;max-height:56px;margin:0 auto;object-fit:contain" />`
+    : `<p style="margin:0;font-family:Arial,sans-serif;font-size:22px;font-weight:900;
+                color:#1a3461">Vision<span style="color:#00b8d9">BI</span></p>`;
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
+<tr><td>
+<div style="max-width:580px;margin:0 auto;background:#ffffff;border-radius:8px;overflow:hidden;
+            border:1px solid #cbd5e1;box-shadow:0 2px 8px rgba(0,0,0,0.07)">
+
+  <div style="background:linear-gradient(90deg,#1a3461 0%,#00b8d9 100%);height:5px"></div>
+
+  <div style="background:#ffffff;padding:24px 40px 20px;text-align:center;border-bottom:1px solid #e2e8f0">
+    ${logoImg}
+  </div>
+
+  <div style="background:#1a3461;padding:12px 40px;text-align:center">
+    <p style="margin:0;font-family:Arial,sans-serif;font-size:12px;font-weight:600;
+              color:#a8c4e8;letter-spacing:2px;text-transform:uppercase">${bandaTitle}</p>
+  </div>
+
+  <div style="padding:32px 40px;background:#ffffff">
+    ${content}
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0" />
+    <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;color:#1a3461;font-weight:700">
+      Equipo VisionBI<br>
+      <span style="font-weight:400;color:#00b8d9;font-size:12px">Technology · Data Analytics</span>
+    </p>
+  </div>
+
+  <div style="background:#1a3461;padding:16px 40px;text-align:center">
+    <p style="margin:0 0 4px;font-family:Arial,sans-serif;font-size:11px;color:#a8c4e8">
+      © 2025 VisionBI — Technology · Data Analytics
+    </p>
+    <p style="margin:0;font-family:Arial,sans-serif;font-size:10px;color:#5b7faa">
+      Mensaje generado automáticamente. Por favor no respondas a este correo.
+    </p>
+  </div>
+
+  <div style="background:linear-gradient(90deg,#1a3461 0%,#00b8d9 100%);height:3px"></div>
+
+</div>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
+function infoCard(borderColor: string, rows: string): string {
+  return `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid ${borderColor};
+              border-radius:4px;padding:16px 20px;margin:20px 0">
+    <table width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+  </div>`;
+}
+
+function fieldRow(label: string, value: string): string {
+  return `<tr>
+    <td style="font-family:Arial,sans-serif;font-size:10px;font-weight:700;color:#64748b;
+               text-transform:uppercase;letter-spacing:1px;padding:8px 0 2px;
+               border-top:1px solid #f1f5f9">${label}</td>
+  </tr>
+  <tr>
+    <td style="font-family:Arial,sans-serif;font-size:14px;color:#1e293b;
+               font-weight:600;padding-bottom:4px">${value}</td>
+  </tr>`;
+}
+
+function ctaBtn(label: string): string {
+  return `<div style="text-align:center;margin:24px 0 8px">
+    <a href="https://visionbi.co/portal/tickets" target="_blank"
+       style="display:inline-block;background:#1a3461;color:#ffffff;padding:12px 28px;
+              border-radius:6px;text-decoration:none;font-family:Arial,sans-serif;
+              font-weight:700;font-size:14px;letter-spacing:0.5px">
+      ${label}
+    </a>
+  </div>`;
+}
+
+function buildAsignadoHtml(titulo: string, logoUrl: string): string {
+  const content = `
+    <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:15px;color:#1a3461;font-weight:700">
+      Tienes un nuevo ticket asignado
+    </p>
+    <p style="margin:0 0 4px;font-family:Arial,sans-serif;font-size:14px;line-height:1.8;color:#334155">
+      Se te ha asignado el siguiente ticket de soporte. Ingresa al portal para revisarlo y comenzar a gestionarlo.
+    </p>
+    ${infoCard("#00b8d9", fieldRow("Ticket asignado", `<span style="font-size:15px">${titulo}</span>`))}
+    ${ctaBtn("Ver ticket en el portal")}`;
+  return layout("Ticket Asignado", content, logoUrl);
+}
+
+function buildEstadoHtml(titulo: string, nuevoEstado: string, logoUrl: string): string {
+  const badge = ESTADO_BADGE[nuevoEstado] ?? "background:#f1f5f9;color:#475569";
+  const label = ESTADO_LABEL[nuevoEstado] ?? nuevoEstado;
+  const content = `
+    <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:15px;color:#1a3461;font-weight:700">
+      El estado de un ticket ha cambiado
+    </p>
+    <p style="margin:0 0 4px;font-family:Arial,sans-serif;font-size:14px;line-height:1.8;color:#334155">
+      Un ticket que te involucra ha sido actualizado. Ingresa al portal para ver los detalles.
+    </p>
+    ${infoCard("#1a3461",
+      fieldRow("Ticket", `<span style="font-size:15px">${titulo}</span>`) +
+      fieldRow("Nuevo estado",
+        `<span style="display:inline-block;padding:3px 12px;border-radius:99px;font-size:13px;
+                      font-weight:700;${badge}">${label}</span>`)
+    )}
+    ${ctaBtn("Ver ticket en el portal")}`;
+  return layout("Actualización de Ticket", content, logoUrl);
+}
+
+function buildComentarioHtml(titulo: string, texto: string, logoUrl: string): string {
+  const content = `
+    <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:15px;color:#1a3461;font-weight:700">
+      Nuevo comentario en tu ticket
+    </p>
+    <p style="margin:0 0 4px;font-family:Arial,sans-serif;font-size:14px;line-height:1.8;color:#334155">
+      Alguien ha dejado un nuevo comentario. Ingresa al portal para responder.
+    </p>
+    ${infoCard("#00b8d9", fieldRow("Ticket", `<span style="font-size:15px">${titulo}</span>`))}
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #94a3b8;
+                border-radius:4px;padding:14px 20px;margin-bottom:4px">
+      <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:10px;font-weight:700;
+                color:#64748b;text-transform:uppercase;letter-spacing:1px">Comentario</p>
+      <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#334155;line-height:1.7">
+        ${texto.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>")}
+      </p>
+    </div>
+    ${ctaBtn("Responder en el portal")}`;
+  return layout("Nuevo Comentario", content, logoUrl);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -109,6 +263,9 @@ serve(async (req) => {
     const { data: isAdminResult } = await userClient.rpc("is_admin");
     const esAdmin = !!isAdminResult;
 
+    const siteUrl = Deno.env.get("SITE_URL") ?? "";
+    const logoUrl = siteUrl ? `${siteUrl}/Logo.jpg` : "";
+
     // deno-lint-ignore no-explicit-any
     const body = await req.json() as Record<string, any>;
     const { action } = body as { action: string };
@@ -144,7 +301,7 @@ serve(async (req) => {
           admin, [asignado_id], user.id,
           "ticket_asignado", "Nuevo ticket asignado", `Se te asignó el ticket: ${titulo}`, meta,
           `[VisionBI] Nuevo ticket asignado: ${titulo}`,
-          `<p>Se te ha asignado un nuevo ticket: <strong>${titulo}</strong>.</p>`,
+          buildAsignadoHtml(titulo, logoUrl),
         );
       }
 
@@ -182,10 +339,7 @@ serve(async (req) => {
         contenido:  { estado_anterior: ticket.estado, estado_nuevo: nuevo_estado },
       });
 
-      const labels: Record<string, string> = {
-        en_progreso: "En progreso", resuelto: "Resuelto", cerrado: "Cerrado",
-      };
-      const label = labels[nuevo_estado] ?? nuevo_estado;
+      const label = ESTADO_LABEL[nuevo_estado] ?? nuevo_estado;
       const meta  = { ticket_id };
 
       await notifyAndEmail(
@@ -193,7 +347,7 @@ serve(async (req) => {
         "ticket_estado", `Ticket actualizado: ${ticket.titulo}`,
         `El estado cambió a "${label}".`, meta,
         `[VisionBI] Ticket actualizado: ${ticket.titulo}`,
-        `<p>El ticket <strong>${ticket.titulo}</strong> cambió a estado <strong>${label}</strong>.</p>`,
+        buildEstadoHtml(ticket.titulo, nuevo_estado, logoUrl),
       );
 
       return ok({ success: true, ticket: updated });
@@ -228,7 +382,7 @@ serve(async (req) => {
         "ticket_asignado", "Ticket asignado", `Se te asignó: ${ticket.titulo}`,
         { ticket_id },
         `[VisionBI] Ticket asignado: ${ticket.titulo}`,
-        `<p>Se te ha asignado el ticket: <strong>${ticket.titulo}</strong>.</p>`,
+        buildAsignadoHtml(ticket.titulo, logoUrl),
       );
 
       return ok({ success: true, ticket: updated });
@@ -257,7 +411,7 @@ serve(async (req) => {
         texto.trim().slice(0, 120),
         { ticket_id },
         `[VisionBI] Nuevo comentario en: ${ticket.titulo}`,
-        `<p>Nuevo comentario en el ticket <strong>${ticket.titulo}</strong>:</p><blockquote>${texto.trim()}</blockquote>`,
+        buildComentarioHtml(ticket.titulo, texto.trim(), logoUrl),
       );
 
       return ok({ success: true, actividad });
