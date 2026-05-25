@@ -9,7 +9,8 @@ import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
-import SessionModal from "@/components/portal/SessionModal";
+import SessionModal         from "@/components/portal/SessionModal";
+import { NotificationBell } from "@/components/NotificationBell";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -252,14 +253,23 @@ const Dashboard = () => {
               )}
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogout}
-            className="text-slate-500 hover:text-red-600 gap-2"
-          >
-            <LogOut className="h-4 w-4" /> Cerrar sesión
-          </Button>
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <button
+              onClick={() => navigate("/portal/tickets")}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-500 hover:text-[#1a3461] hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              Tickets
+            </button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="text-slate-500 hover:text-red-600 gap-2"
+            >
+              <LogOut className="h-4 w-4" /> Cerrar sesión
+            </Button>
+          </div>
         </div>
       </header>
 
