@@ -8,7 +8,7 @@ import {
   Estado, Prioridad,
   ESTADO_LABELS, PRIORIDAD_LABELS, ESTADO_COLOR, PRIORIDAD_COLOR,
 } from "@/lib/ticketStateMachine";
-import { TicketModal, Ticket, Miembro, Proyecto } from "@/components/tickets/TicketModal";
+import { TicketModal, Ticket, Proyecto } from "@/components/tickets/TicketModal";
 
 // ── Tipos locales ─────────────────────────────────────────────────────────────
 
@@ -19,10 +19,6 @@ interface MyEu {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function emailOf(userId: string, miembros: Miembro[]) {
-  return miembros.find((m) => m.user_id === userId)?.correo_usuario ?? "—";
-}
 
 function avgResolutionHours(tickets: Ticket[]): number | null {
   const resolved = tickets.filter((t) => t.resolved_at);
@@ -45,7 +41,6 @@ const TicketsPage = () => {
   const [myEu,      setMyEu]      = useState<MyEu | null>(null);
   const [esAdmin,   setEsAdmin]   = useState(false);
   const [tickets,   setTickets]   = useState<Ticket[]>([]);
-  const [miembros,  setMiembros]  = useState<Miembro[]>([]);
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [loading,   setLoading]   = useState(true);
 
@@ -75,12 +70,7 @@ const TicketsPage = () => {
       const { data: adminResult } = await supabase.rpc("is_admin");
       setEsAdmin(!!adminResult);
 
-      const [{ data: miemb }, { data: proy }, { data: tix }] = await Promise.all([
-        supabase
-          .from("empresa_usuarios")
-          .select("user_id, correo_usuario, role")
-          .eq("cliente_id", (eu as MyEu).cliente_id)
-          .eq("status", "active"),
+      const [{ data: proy }, { data: tix }] = await Promise.all([
         supabase
           .from("proyectos")
           .select("id, nombre")
@@ -92,7 +82,6 @@ const TicketsPage = () => {
           .order("created_at", { ascending: false }),
       ]);
 
-      setMiembros((miemb as Miembro[]) ?? []);
       setProyectos((proy as Proyecto[]) ?? []);
       setTickets((tix as Ticket[]) ?? []);
       setLoading(false);
@@ -267,7 +256,6 @@ const TicketsPage = () => {
 
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 mt-1.5 text-xs text-slate-400">
                       <span>{t.proyecto?.nombre}</span>
-                      {t.asignado_id && <span>Asignado: {emailOf(t.asignado_id, miembros)}</span>}
                       <span>{new Date(t.created_at).toLocaleDateString("es-CO", { day: "numeric", month: "short" })}</span>
                     </div>
                   </div>
@@ -284,10 +272,11 @@ const TicketsPage = () => {
         onClose={() => setModal({ open: false })}
         onCreated={onCreated}
         onUpdated={onUpdated}
-        miembros={miembros}
+        miembros={[]}
         proyectos={proyectos}
         myUserId={myEu?.user_id ?? ""}
         esAdmin={esAdmin}
+        allowAssign={false}
       />
     </div>
   );

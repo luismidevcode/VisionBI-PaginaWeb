@@ -7,11 +7,14 @@ import {
   Plus, Pencil, Video, ExternalLink, Clock,
   Building2, Phone, Mail, Hash, UserCheck, UserX,
   Shield, ToggleLeft, ToggleRight, ChevronDown, ChevronUp,
+  TicketIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import ClienteModal, { type ClienteRow } from "@/components/admin/ClienteModal";
 import ProyectoModal, { type ProyectoRow } from "@/components/admin/ProyectoModal";
+import { TicketModal, type Ticket, type Miembro } from "@/components/tickets/TicketModal";
+import { ESTADO_LABELS, PRIORIDAD_LABELS, ESTADO_COLOR, PRIORIDAD_COLOR } from "@/lib/ticketStateMachine";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -104,7 +107,7 @@ function estadoBadge(estado: string) {
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [loading,     setLoading]     = useState(true);
-  const [activeTab,   setActiveTab]   = useState<"agenda" | "clientes" | "proyectos" | "usuarios">("agenda");
+  const [activeTab,   setActiveTab]   = useState<"agenda" | "clientes" | "proyectos" | "usuarios" | "tickets">("agenda");
   const [showAll,     setShowAll]     = useState(false);
 
   const [agendaItems,   setAgendaItems]   = useState<AgendaItem[]>([]);
@@ -113,6 +116,14 @@ const AdminDashboard = () => {
   const [usuarios,      setUsuarios]      = useState<EmpresaUsuarioRow[]>([]);
   const [expandedUser,  setExpandedUser]  = useState<string | null>(null);
   const [savingUser,    setSavingUser]    = useState<string | null>(null);
+
+  // Tickets
+  const [adminTickets,   setAdminTickets]   = useState<(Ticket & { empresa?: string })[]>([]);
+  const [adminTeam,      setAdminTeam]      = useState<Miembro[]>([]);
+  const [ticketModal,    setTicketModal]    = useState<{ open: boolean; ticketId?: string }>({ open: false });
+  const [ticketEstado,   setTicketEstado]   = useState("todos");
+  const [ticketCliente,  setTicketCliente]  = useState("todos");
+  const [adminUserId,    setAdminUserId]    = useState("");
 
   const [clienteModal,  setClienteModal]  = useState<{ open: boolean; cliente: ClienteRow | null }>({ open: false, cliente: null });
   const [proyectoModal, setProyectoModal] = useState<{ open: boolean; proyecto: ProyectoRow | null }>({ open: false, proyecto: null });
@@ -126,12 +137,16 @@ const AdminDashboard = () => {
       return;
     }
 
-    const [agRes, sesRes, clRes, prRes, usRes] = await Promise.all([
+    setAdminUserId(session.user.id);
+
+    const [agRes, sesRes, clRes, prRes, usRes, txRes, teamRes] = await Promise.all([
       supabase.from("agendamientos").select("*, clientes(empresa, correo)").order("fecha_inicio"),
       supabase.from("sesiones_proyecto").select("*, proyectos(nombre, clientes(empresa))").order("fecha_inicio"),
       supabase.from("clientes").select("*").order("empresa"),
       supabase.from("proyectos").select("*, clientes(empresa)").order("nombre"),
       supabase.from("empresa_usuarios").select("*, clientes(empresa)").order("created_at", { ascending: false }),
+      supabase.from("tickets").select("*, proyecto:proyectos(nombre, clientes(empresa))").order("created_at", { ascending: false }),
+      supabase.rpc("list_admin_users"),
     ]);
 
     const agItems: AgendaItem[] = (agRes.data as AgendamientoRow[] ?? []).map((a) => ({
@@ -166,6 +181,20 @@ const AdminDashboard = () => {
     setClientes((clRes.data as ClienteRow[]) ?? []);
     setProyectos((prRes.data as ProyectoRow[]) ?? []);
     setUsuarios((usRes.data as EmpresaUsuarioRow[]) ?? []);
+
+    // Tickets: add empresa name from nested join
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawTickets = (txRes.data ?? []) as any[];
+    setAdminTickets(rawTickets.map((t) => ({
+      ...t,
+      empresa: t.proyecto?.clientes?.empresa ?? "—",
+    })));
+    setAdminTeam(((teamRes.data ?? []) as { user_id: string; correo_usuario: string }[]).map((u) => ({
+      user_id:        u.user_id,
+      correo_usuario: u.correo_usuario,
+      role:           "admin",
+    })));
+
     setLoading(false);
   }, [navigate]);
 
@@ -215,11 +244,14 @@ const AdminDashboard = () => {
 
   const pendingCount = usuarios.filter((u) => u.status === "pending").length;
 
+  const unassignedCount = adminTickets.filter((t) => !t.asignado_id && t.estado !== "cerrado").length;
+
   const tabs = [
-    { key: "agenda",    label: "Agenda",    icon: CalendarDays },
-    { key: "clientes",  label: "Clientes",  icon: Users },
-    { key: "proyectos", label: "Proyectos", icon: FolderKanban },
-    { key: "usuarios",  label: "Usuarios",  icon: Shield, badge: pendingCount },
+    { key: "agenda",    label: "Agenda",    icon: CalendarDays,  badge: 0 },
+    { key: "clientes",  label: "Clientes",  icon: Users,         badge: 0 },
+    { key: "proyectos", label: "Proyectos", icon: FolderKanban,  badge: 0 },
+    { key: "usuarios",  label: "Usuarios",  icon: Shield,        badge: pendingCount },
+    { key: "tickets",   label: "Tickets",   icon: TicketIcon,    badge: unassignedCount },
   ] as const;
 
   return (
@@ -682,7 +714,144 @@ const AdminDashboard = () => {
           );
         })()}
 
+        {/* ── Tickets ── */}
+        {activeTab === "tickets" && (() => {
+          const clienteOptions = Array.from(new Set(adminTickets.map((t) => t.empresa).filter(Boolean)));
+          const filtered = adminTickets.filter((t) => {
+            if (ticketEstado  !== "todos" && t.estado  !== ticketEstado)  return false;
+            if (ticketCliente !== "todos" && t.empresa !== ticketCliente) return false;
+            return true;
+          });
+
+          return (
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-bold text-[#1a3461]">
+                  Tickets — {filtered.length}
+                  {unassignedCount > 0 && (
+                    <span className="ml-2 text-sm font-normal text-orange-600">
+                      ({unassignedCount} sin asignar)
+                    </span>
+                  )}
+                </h2>
+              </div>
+
+              {/* Filtros */}
+              <div className="flex flex-wrap gap-3 mb-5">
+                <select
+                  value={ticketEstado}
+                  onChange={(e) => setTicketEstado(e.target.value)}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white"
+                >
+                  <option value="todos">Todos los estados</option>
+                  {(["abierto","en_progreso","resuelto","cerrado"] as const).map((s) => (
+                    <option key={s} value={s}>{ESTADO_LABELS[s]}</option>
+                  ))}
+                </select>
+                <select
+                  value={ticketCliente}
+                  onChange={(e) => setTicketCliente(e.target.value)}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white"
+                >
+                  <option value="todos">Todos los clientes</option>
+                  {clienteOptions.map((e) => <option key={e} value={e}>{e}</option>)}
+                </select>
+              </div>
+
+              {filtered.length === 0 ? (
+                <div className="text-center py-16 bg-white rounded-xl border border-slate-200">
+                  <TicketIcon className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-500 font-medium">No hay tickets</p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        {["Cliente", "Proyecto", "Título", "Prioridad", "Estado", "Asignado", ""].map((h) => (
+                          <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filtered.map((t) => (
+                        <tr key={t.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="px-4 py-3 text-slate-600 text-xs whitespace-nowrap">{t.empresa}</td>
+                          <td className="px-4 py-3 text-slate-600 text-xs whitespace-nowrap">{t.proyecto?.nombre ?? "—"}</td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => setTicketModal({ open: true, ticketId: t.id })}
+                              className="text-sm font-medium text-[#1a3461] hover:underline text-left"
+                            >
+                              {t.titulo}
+                            </button>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${PRIORIDAD_COLOR[t.prioridad]}`}>
+                              {PRIORIDAD_LABELS[t.prioridad]}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ESTADO_COLOR[t.estado]}`}>
+                              {ESTADO_LABELS[t.estado]}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <select
+                              value={t.asignado_id ?? ""}
+                              onChange={async (e) => {
+                                const asignado_id = e.target.value;
+                                if (!asignado_id) return;
+                                await supabase.functions.invoke("ticket-action", {
+                                  body: { action: "assign", ticket_id: t.id, asignado_id },
+                                });
+                                setAdminTickets((prev) =>
+                                  prev.map((x) => x.id === t.id ? { ...x, asignado_id } : x)
+                                );
+                              }}
+                              className="text-xs border border-slate-200 rounded px-2 py-1 bg-white max-w-[160px]"
+                            >
+                              <option value="">Sin asignar</option>
+                              {adminTeam.map((m) => (
+                                <option key={m.user_id} value={m.user_id}>{m.correo_usuario}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => setTicketModal({ open: true, ticketId: t.id })}
+                              className="text-xs text-slate-400 hover:text-[#1a3461]"
+                            >
+                              Ver
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
       </main>
+
+      {/* Modal tickets admin */}
+      <TicketModal
+        open={ticketModal.open}
+        ticketId={ticketModal.ticketId}
+        onClose={() => setTicketModal({ open: false })}
+        onCreated={() => loadData()}
+        onUpdated={(t) => setAdminTickets((prev) => prev.map((x) => x.id === t.id ? { ...x, ...t } : x))}
+        miembros={adminTeam}
+        proyectos={[]}
+        myUserId={adminUserId}
+        esAdmin={true}
+        allowAssign={true}
+      />
 
       {/* Modales */}
       <ClienteModal

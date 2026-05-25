@@ -208,11 +208,7 @@ serve(async (req) => {
         .from("tickets").select("*").eq("id", ticket_id).single();
       if (fetchErr || !ticket) return fail("Ticket no encontrado.", 404);
 
-      const { data: eu } = await admin
-        .from("empresa_usuarios").select("role").eq("user_id", user.id).maybeSingle();
-      const puedeAsignar = esAdmin || user.id === ticket.creador_id ||
-        ["owner","manager"].includes(eu?.role ?? "");
-      if (!puedeAsignar) return fail("No tienes permiso para asignar este ticket.", 403);
+      if (!esAdmin) return fail("Solo un administrador puede asignar tickets.", 403);
 
       const { data: updated, error: updErr } = await admin
         .from("tickets")

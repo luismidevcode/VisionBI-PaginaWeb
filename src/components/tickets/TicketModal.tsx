@@ -58,15 +58,16 @@ interface Adjunto {
 }
 
 interface Props {
-  open:       boolean;
-  ticketId?:  string;
-  onClose:    () => void;
-  onCreated:  (t: Ticket) => void;
-  onUpdated:  (t: Ticket) => void;
-  miembros:   Miembro[];
-  proyectos:  Proyecto[];
-  myUserId:   string;
-  esAdmin:    boolean;
+  open:          boolean;
+  ticketId?:     string;
+  onClose:       () => void;
+  onCreated:     (t: Ticket) => void;
+  onUpdated:     (t: Ticket) => void;
+  miembros:      Miembro[];
+  proyectos:     Proyecto[];
+  myUserId:      string;
+  esAdmin:       boolean;
+  allowAssign?:  boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -79,15 +80,16 @@ const ESTADO_BTN_LABEL: Record<Estado, string> = {
   cerrado:     "",
 };
 
-function emailOf(userId: string, miembros: Miembro[]) {
-  return miembros.find((m) => m.user_id === userId)?.correo_usuario ?? userId.slice(0, 8) + "…";
+function emailOf(userId: string, miembros: Miembro[], myUserId?: string) {
+  if (userId === myUserId) return "Tú";
+  return miembros.find((m) => m.user_id === userId)?.correo_usuario ?? "Equipo VisionBI";
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export const TicketModal = ({
   open, ticketId, onClose, onCreated, onUpdated,
-  miembros, proyectos, myUserId, esAdmin,
+  miembros, proyectos, myUserId, esAdmin, allowAssign = false,
 }: Props) => {
   const isCreate = !ticketId;
 
@@ -252,13 +254,7 @@ export const TicketModal = ({
   const canTransitionToNext = ticket
     ? disponibles.some((s) => puedeTransicionar(ticket.estado, s, myUserId, ticket.creador_id, ticket.asignado_id, esAdmin).permitido)
     : false;
-  const canAssign = ticket
-    ? (esAdmin || myUserId === ticket.creador_id || ["owner","manager"].includes(
-        miembros.find((m) => m.user_id === myUserId)?.role ?? ""
-      ))
-    : false;
 
-  // Inicio del ticket: abierto → en_progreso is the first transition
   const canStart = ticket?.estado === "abierto" &&
     puedeTransicionar("abierto", "en_progreso", myUserId, ticket.creador_id, ticket.asignado_id, esAdmin).permitido;
 
@@ -328,20 +324,6 @@ export const TicketModal = ({
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Asignar a</Label>
-              <select
-                value={asignadoId}
-                onChange={(e) => setAsignadoId(e.target.value)}
-                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white"
-              >
-                <option value="">Sin asignar</option>
-                {miembros.map((m) => (
-                  <option key={m.user_id} value={m.user_id}>{m.correo_usuario}</option>
-                ))}
-              </select>
-            </div>
-
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={onClose}>Cancelar</Button>
               <Button
@@ -388,12 +370,12 @@ export const TicketModal = ({
                 <div className="grid grid-cols-2 gap-3 text-xs text-slate-500">
                   <div>
                     <span className="font-semibold uppercase tracking-wide">Creado por</span>
-                    <p className="mt-0.5 text-slate-700">{emailOf(ticket.creador_id, miembros)}</p>
+                    <p className="mt-0.5 text-slate-700">{emailOf(ticket.creador_id, miembros, myUserId)}</p>
                   </div>
                   <div>
                     <span className="font-semibold uppercase tracking-wide">Asignado a</span>
                     <div className="mt-0.5 flex items-center gap-1">
-                      {canAssign ? (
+                      {allowAssign ? (
                         <select
                           value={ticket.asignado_id ?? ""}
                           onChange={(e) => handleAssign(e.target.value)}
@@ -407,7 +389,7 @@ export const TicketModal = ({
                         </select>
                       ) : (
                         <span className="text-slate-700">
-                          {ticket.asignado_id ? emailOf(ticket.asignado_id, miembros) : "Sin asignar"}
+                          {ticket.asignado_id ? emailOf(ticket.asignado_id, miembros, myUserId) : "Sin asignar"}
                         </span>
                       )}
                     </div>
@@ -516,7 +498,7 @@ export const TicketModal = ({
                       <p className="text-xs text-slate-400">Sin actividad registrada.</p>
                     )}
                     {actividad.map((a) => {
-                      const autor = emailOf(a.usuario_id, miembros);
+                      const autor = emailOf(a.usuario_id, miembros, myUserId);
                       const fecha = new Date(a.created_at).toLocaleDateString("es-CO", {
                         day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
                       });
@@ -542,7 +524,7 @@ export const TicketModal = ({
                             <span className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0" />
                             <span>
                               <strong className="text-slate-700">{autor}</strong>
-                              {" asignó a "}<strong className="text-slate-700">{emailOf(c.asignado_nuevo, miembros)}</strong>
+                              {" asignó a "}<strong className="text-slate-700">{emailOf(c.asignado_nuevo, miembros, myUserId)}</strong>
                               {" · "}{fecha}
                             </span>
                           </div>
