@@ -466,23 +466,40 @@ export const TicketModal = ({
                       )}
                     </div>
                     {adjuntos.length > 0 ? (
-                      <div className="space-y-1.5">
-                        {adjuntos.map((a) => (
-                          <div key={a.id} className="flex items-center gap-2 text-sm bg-slate-50 rounded-lg px-3 py-2">
-                            <Paperclip className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                            <span className="flex-1 truncate text-slate-700">{a.nombre}</span>
-                            {signedUrls[a.id] && (
-                              <a
-                                href={signedUrls[a.id]}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[#00b8d9] hover:text-[#0099b8]"
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                              </a>
-                            )}
-                          </div>
-                        ))}
+                      <div className="space-y-2">
+                        {adjuntos.map((a) => {
+                          const isImage = a.tipo_mime?.startsWith("image/");
+                          const url = signedUrls[a.id];
+                          return (
+                            <div key={a.id}>
+                              {isImage && url ? (
+                                <div className="rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                                  <img
+                                    src={url}
+                                    alt={a.nombre}
+                                    className="max-h-64 w-full object-contain"
+                                  />
+                                  <div className="flex items-center justify-between px-3 py-1.5 border-t border-slate-200">
+                                    <span className="text-xs text-slate-500 truncate">{a.nombre}</span>
+                                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-[#00b8d9] hover:text-[#0099b8] ml-2 shrink-0">
+                                      <Download className="h-3.5 w-3.5" />
+                                    </a>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 text-sm bg-slate-50 rounded-lg px-3 py-2">
+                                  <Paperclip className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                  <span className="flex-1 truncate text-slate-700">{a.nombre}</span>
+                                  {url && (
+                                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-[#00b8d9] hover:text-[#0099b8]">
+                                      <Download className="h-3.5 w-3.5" />
+                                    </a>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="text-xs text-slate-400">Sin adjuntos.</p>

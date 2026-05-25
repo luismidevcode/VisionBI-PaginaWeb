@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Ticket as TicketIcon, ArrowLeft, Search, Clock } from "lucide-react";
+import { Plus, Ticket as TicketIcon, ArrowLeft, Search } from "lucide-react";
 import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
@@ -19,16 +19,6 @@ interface MyEu {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function avgResolutionHours(tickets: Ticket[]): number | null {
-  const resolved = tickets.filter((t) => t.resolved_at);
-  if (resolved.length === 0) return null;
-  const total = resolved.reduce(
-    (sum, t) => sum + (new Date(t.resolved_at!).getTime() - new Date(t.created_at).getTime()),
-    0,
-  );
-  return Math.round(total / resolved.length / 3600000);
-}
 
 const ESTADOS:    Estado[]    = ["abierto", "en_progreso", "resuelto", "cerrado"];
 const PRIORIDADES: Prioridad[] = ["baja", "media", "alta", "critica"];
@@ -101,12 +91,6 @@ const TicketsPage = () => {
     });
   }, [tickets, filterEstado, filterPrioridad, filterProyecto, search]);
 
-  const stats = useMemo(() => {
-    const by: Record<string, number> = { abierto: 0, en_progreso: 0, resuelto: 0, cerrado: 0 };
-    tickets.forEach((t) => { by[t.estado] = (by[t.estado] ?? 0) + 1; });
-    return { total: tickets.length, by, avg: avgResolutionHours(tickets) };
-  }, [tickets]);
-
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const onCreated = (t: Ticket) => setTickets((prev) => [t, ...prev]);
@@ -151,30 +135,6 @@ const TicketsPage = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {[
-            { label: "Total",       value: stats.total,              color: "text-slate-700" },
-            { label: "Abiertos",    value: stats.by.abierto ?? 0,    color: "text-yellow-600" },
-            { label: "En progreso", value: stats.by.en_progreso ?? 0, color: "text-blue-600" },
-            { label: "Resueltos",   value: stats.by.resuelto ?? 0,   color: "text-green-600" },
-            { label: "Cerrados",    value: stats.by.cerrado ?? 0,    color: "text-slate-500" },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="bg-white rounded-xl border border-slate-200 p-4 text-center">
-              <p className={`text-2xl font-bold ${color}`}>{value}</p>
-              <p className="text-xs text-slate-500 mt-0.5">{label}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Tiempo promedio de resolución */}
-        {stats.avg !== null && (
-          <div className="flex items-center gap-2 text-sm text-slate-500 bg-white rounded-xl border border-slate-200 px-4 py-3">
-            <Clock className="h-4 w-4 text-slate-400" />
-            Tiempo promedio de resolución: <strong className="text-slate-700">{stats.avg}h</strong>
-          </div>
-        )}
 
         {/* Filtros */}
         <div className="flex flex-wrap gap-3">

@@ -723,9 +723,20 @@ const AdminDashboard = () => {
             return true;
           });
 
+          const byEstado = { abierto: 0, en_progreso: 0, resuelto: 0, cerrado: 0 } as Record<string, number>;
+          adminTickets.forEach((t) => { byEstado[t.estado] = (byEstado[t.estado] ?? 0) + 1; });
+
+          const criticas = adminTickets.filter((t) => t.prioridad === "critica" && t.estado !== "cerrado").length;
+          const conResolucion = adminTickets.filter((t) => t.resolved_at);
+          const avgHoras = conResolucion.length > 0
+            ? Math.round(conResolucion.reduce(
+                (sum, t) => sum + (new Date(t.resolved_at!).getTime() - new Date(t.created_at).getTime()), 0
+              ) / conResolucion.length / 3600000)
+            : null;
+
           return (
             <div>
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold text-[#1a3461]">
                   Tickets — {filtered.length}
                   {unassignedCount > 0 && (
@@ -734,6 +745,35 @@ const AdminDashboard = () => {
                     </span>
                   )}
                 </h2>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+                {[
+                  { label: "Total",       value: adminTickets.length,       color: "text-slate-700" },
+                  { label: "Abiertos",    value: byEstado.abierto ?? 0,     color: "text-yellow-600" },
+                  { label: "En progreso", value: byEstado.en_progreso ?? 0, color: "text-blue-600" },
+                  { label: "Resueltos",   value: byEstado.resuelto ?? 0,    color: "text-green-600" },
+                  { label: "Cerrados",    value: byEstado.cerrado ?? 0,     color: "text-slate-400" },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="bg-white rounded-xl border border-slate-200 p-4 text-center">
+                    <p className={`text-2xl font-bold ${color}`}>{value}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{label}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-3 mb-5">
+                {criticas > 0 && (
+                  <div className="flex items-center gap-2 text-sm bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5">
+                    <span className="font-bold">{criticas}</span> ticket{criticas !== 1 ? "s" : ""} crítico{criticas !== 1 ? "s" : ""} abierto{criticas !== 1 ? "s" : ""}
+                  </div>
+                )}
+                {avgHoras !== null && (
+                  <div className="flex items-center gap-2 text-sm bg-white border border-slate-200 text-slate-600 rounded-xl px-4 py-2.5">
+                    <Clock className="h-4 w-4 text-slate-400" />
+                    Tiempo promedio de resolución: <strong className="text-slate-700">{avgHoras}h</strong>
+                  </div>
+                )}
               </div>
 
               {/* Filtros */}
