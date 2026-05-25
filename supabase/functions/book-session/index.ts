@@ -208,11 +208,24 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // 2. Obtener cliente y proyecto
+    // 2. Obtener empresa_usuario y verificar permiso de reserva
+    const { data: eu, error: euErr } = await supabase
+      .from("empresa_usuarios")
+      .select("cliente_id, can_book_sessions, status")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .single();
+    if (euErr || !eu) throw new Error("Usuario no asociado a ninguna empresa activa");
+    if (!eu.can_book_sessions) {
+      return new Response(JSON.stringify({ error: "No tienes permiso para reservar sesiones" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data: cliente, error: clienteErr } = await supabase
       .from("clientes")
       .select("id, empresa, correo, telefono")
-      .eq("correo", user.email!)
+      .eq("id", eu.cliente_id)
       .single();
     if (clienteErr || !cliente) throw new Error("Cliente no encontrado");
 

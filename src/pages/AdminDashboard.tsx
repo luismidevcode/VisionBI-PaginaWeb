@@ -5,7 +5,8 @@ import { es } from "date-fns/locale";
 import {
   LogOut, CalendarDays, Users, FolderKanban,
   Plus, Pencil, Video, ExternalLink, Clock,
-  Building2, Phone, Mail, Hash,
+  Building2, Phone, Mail, Hash, UserCheck, UserX,
+  Shield, ToggleLeft, ToggleRight, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
@@ -16,7 +17,32 @@ import ProyectoModal, { type ProyectoRow } from "@/components/admin/ProyectoModa
 
 const ADMIN_EMAILS = ["luis.visionbi@gmail.com", "luismiguelbotero2327@gmail.com"];
 
+const ROLE_OPTIONS = ["owner", "manager", "analista", "viewer"] as const;
+type Role = typeof ROLE_OPTIONS[number];
+
+const ROLE_LABELS: Record<Role, string> = {
+  owner:    "Owner",
+  manager:  "Manager",
+  analista: "Analista",
+  viewer:   "Viewer",
+};
+
 // ─── Tipos ────────────────────────────────────────────────────────────────────
+
+interface EmpresaUsuarioRow {
+  id:                string;
+  cliente_id:        string;
+  user_id:           string;
+  correo_usuario:    string;
+  role:              Role;
+  can_book_sessions: boolean;
+  can_view_projects: boolean;
+  can_view_sessions: boolean;
+  can_edit_company:  boolean;
+  status:            "pending" | "active" | "disabled";
+  created_at:        string;
+  clientes:          { empresa: string } | null;
+}
 
 interface AgendamientoRow {
   id: string;
@@ -78,12 +104,15 @@ function estadoBadge(estado: string) {
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [loading,     setLoading]     = useState(true);
-  const [activeTab,   setActiveTab]   = useState<"agenda" | "clientes" | "proyectos">("agenda");
+  const [activeTab,   setActiveTab]   = useState<"agenda" | "clientes" | "proyectos" | "usuarios">("agenda");
   const [showAll,     setShowAll]     = useState(false);
 
-  const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([]);
-  const [clientes,    setClientes]    = useState<ClienteRow[]>([]);
-  const [proyectos,   setProyectos]   = useState<ProyectoRow[]>([]);
+  const [agendaItems,   setAgendaItems]   = useState<AgendaItem[]>([]);
+  const [clientes,      setClientes]      = useState<ClienteRow[]>([]);
+  const [proyectos,     setProyectos]     = useState<ProyectoRow[]>([]);
+  const [usuarios,      setUsuarios]      = useState<EmpresaUsuarioRow[]>([]);
+  const [expandedUser,  setExpandedUser]  = useState<string | null>(null);
+  const [savingUser,    setSavingUser]    = useState<string | null>(null);
 
   const [clienteModal,  setClienteModal]  = useState<{ open: boolean; cliente: ClienteRow | null }>({ open: false, cliente: null });
   const [proyectoModal, setProyectoModal] = useState<{ open: boolean; proyecto: ProyectoRow | null }>({ open: false, proyecto: null });
@@ -97,11 +126,12 @@ const AdminDashboard = () => {
       return;
     }
 
-    const [agRes, sesRes, clRes, prRes] = await Promise.all([
+    const [agRes, sesRes, clRes, prRes, usRes] = await Promise.all([
       supabase.from("agendamientos").select("*, clientes(empresa, correo)").order("fecha_inicio"),
       supabase.from("sesiones_proyecto").select("*, proyectos(nombre, clientes(empresa))").order("fecha_inicio"),
       supabase.from("clientes").select("*").order("empresa"),
       supabase.from("proyectos").select("*, clientes(empresa)").order("nombre"),
+      supabase.from("empresa_usuarios").select("*, clientes(empresa)").order("created_at", { ascending: false }),
     ]);
 
     const agItems: AgendaItem[] = (agRes.data as AgendamientoRow[] ?? []).map((a) => ({
@@ -135,6 +165,7 @@ const AdminDashboard = () => {
     setAgendaItems(combined);
     setClientes((clRes.data as ClienteRow[]) ?? []);
     setProyectos((prRes.data as ProyectoRow[]) ?? []);
+    setUsuarios((usRes.data as EmpresaUsuarioRow[]) ?? []);
     setLoading(false);
   }, [navigate]);
 
@@ -144,6 +175,26 @@ const AdminDashboard = () => {
     await supabase.auth.signOut();
     navigate("/admin");
   };
+
+  // ── Gestión de usuarios ──────────────────────────────────────────────────────
+
+  const updateUsuario = async (id: string, changes: Partial<EmpresaUsuarioRow>) => {
+    setSavingUser(id);
+    const { error } = await supabase
+      .from("empresa_usuarios")
+      .update({ ...changes, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (!error) {
+      setUsuarios((prev) => prev.map((u) => u.id === id ? { ...u, ...changes } : u));
+    }
+    setSavingUser(null);
+  };
+
+  const aprobarUsuario = (u: EmpresaUsuarioRow) =>
+    updateUsuario(u.id, { status: "active" });
+
+  const rechazarUsuario = (u: EmpresaUsuarioRow) =>
+    updateUsuario(u.id, { status: "disabled" });
 
   // ── Filtro agenda ────────────────────────────────────────────────────────────
 
@@ -162,10 +213,13 @@ const AdminDashboard = () => {
     );
   }
 
+  const pendingCount = usuarios.filter((u) => u.status === "pending").length;
+
   const tabs = [
     { key: "agenda",    label: "Agenda",    icon: CalendarDays },
     { key: "clientes",  label: "Clientes",  icon: Users },
     { key: "proyectos", label: "Proyectos", icon: FolderKanban },
+    { key: "usuarios",  label: "Usuarios",  icon: Shield, badge: pendingCount },
   ] as const;
 
   return (
@@ -199,19 +253,27 @@ const AdminDashboard = () => {
       {/* Tabs */}
       <div className="bg-white border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-4 flex gap-1">
-          {tabs.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`flex items-center gap-2 px-4 py-3.5 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === key
-                  ? "border-[#1a3461] text-[#1a3461]"
-                  : "border-transparent text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              <Icon className="h-4 w-4" /> {label}
-            </button>
-          ))}
+          {tabs.map(({ key, label, icon: Icon, ...rest }) => {
+            const badge = "badge" in rest ? (rest as { badge: number }).badge : 0;
+            return (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`flex items-center gap-2 px-4 py-3.5 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === key
+                    ? "border-[#1a3461] text-[#1a3461]"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Icon className="h-4 w-4" /> {label}
+                {badge > 0 && (
+                  <span className="ml-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                    {badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -449,6 +511,177 @@ const AdminDashboard = () => {
             )}
           </div>
         )}
+        {/* ── Usuarios ── */}
+        {activeTab === "usuarios" && (() => {
+          const pending  = usuarios.filter((u) => u.status === "pending");
+          const active   = usuarios.filter((u) => u.status === "active");
+          const disabled = usuarios.filter((u) => u.status === "disabled");
+
+          const MODULE_KEYS = [
+            { key: "can_view_projects",  label: "Ver proyectos" },
+            { key: "can_view_sessions",  label: "Ver sesiones" },
+            { key: "can_book_sessions",  label: "Reservar sesiones" },
+            { key: "can_edit_company",   label: "Editar empresa" },
+          ] as const;
+
+          const UserRow = ({ u }: { u: EmpresaUsuarioRow }) => {
+            const isExpanded = expandedUser === u.id;
+            const isSaving   = savingUser === u.id;
+            return (
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <div
+                  className="flex items-center gap-3 px-4 py-3 bg-white cursor-pointer hover:bg-slate-50"
+                  onClick={() => setExpandedUser(isExpanded ? null : u.id)}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{u.correo_usuario}</p>
+                    <p className="text-xs text-slate-400">{u.clientes?.empresa ?? "—"}</p>
+                  </div>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
+                    u.role === "owner"    ? "bg-purple-50 text-purple-700 border-purple-200" :
+                    u.role === "manager"  ? "bg-blue-50 text-blue-700 border-blue-200" :
+                    u.role === "analista" ? "bg-cyan-50 text-cyan-700 border-cyan-200" :
+                                           "bg-slate-50 text-slate-600 border-slate-200"
+                  }`}>
+                    {ROLE_LABELS[u.role]}
+                  </span>
+                  {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                </div>
+
+                {isExpanded && (
+                  <div className="border-t border-slate-200 bg-slate-50 p-4 space-y-4">
+                    {/* Rol */}
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-semibold text-slate-500 w-24">Rol</span>
+                      <select
+                        value={u.role}
+                        disabled={isSaving}
+                        onChange={(e) => updateUsuario(u.id, { role: e.target.value as Role })}
+                        className="text-sm border border-slate-200 rounded-md px-2 py-1 bg-white"
+                      >
+                        {ROLE_OPTIONS.map((r) => (
+                          <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Módulos */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-slate-500">Módulos</p>
+                      {MODULE_KEYS.map(({ key, label }) => {
+                        const val = u[key] as boolean;
+                        return (
+                          <button
+                            key={key}
+                            disabled={isSaving}
+                            onClick={() => updateUsuario(u.id, { [key]: !val })}
+                            className="flex items-center gap-2 w-full text-left text-sm text-slate-700 hover:text-[#1a3461]"
+                          >
+                            {val
+                              ? <ToggleRight className="h-5 w-5 text-green-500 flex-shrink-0" />
+                              : <ToggleLeft  className="h-5 w-5 text-slate-300 flex-shrink-0" />
+                            }
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Estado */}
+                    {u.status !== "disabled" && (
+                      <button
+                        disabled={isSaving}
+                        onClick={() => rechazarUsuario(u)}
+                        className="text-xs text-red-600 hover:underline"
+                      >
+                        Deshabilitar usuario
+                      </button>
+                    )}
+                    {u.status === "disabled" && (
+                      <button
+                        disabled={isSaving}
+                        onClick={() => aprobarUsuario(u)}
+                        className="text-xs text-green-600 hover:underline"
+                      >
+                        Rehabilitar usuario
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          };
+
+          return (
+            <div className="space-y-8">
+              {/* Pendientes */}
+              {pending.length > 0 && (
+                <div>
+                  <h2 className="text-lg font-bold text-[#1a3461] mb-4 flex items-center gap-2">
+                    <UserCheck className="h-5 w-5 text-amber-500" />
+                    Pendientes de aprobación — {pending.length}
+                  </h2>
+                  <div className="space-y-2">
+                    {pending.map((u) => (
+                      <div key={u.id} className="bg-white rounded-xl border border-amber-200 p-4 flex items-center gap-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-800">{u.correo_usuario}</p>
+                          <p className="text-xs text-slate-400">{u.clientes?.empresa ?? "—"}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            disabled={savingUser === u.id}
+                            className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
+                            onClick={() => aprobarUsuario(u)}
+                          >
+                            <UserCheck className="h-3.5 w-3.5" /> Aprobar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={savingUser === u.id}
+                            className="border-red-200 text-red-600 hover:bg-red-50 gap-1.5"
+                            onClick={() => rechazarUsuario(u)}
+                          >
+                            <UserX className="h-3.5 w-3.5" /> Rechazar
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Activos */}
+              <div>
+                <h2 className="text-lg font-bold text-[#1a3461] mb-4">
+                  Usuarios activos — {active.length}
+                </h2>
+                {active.length === 0 ? (
+                  <p className="text-slate-400 text-sm">Sin usuarios activos.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {active.map((u) => <UserRow key={u.id} u={u} />)}
+                  </div>
+                )}
+              </div>
+
+              {/* Deshabilitados */}
+              {disabled.length > 0 && (
+                <div>
+                  <h2 className="text-base font-semibold text-slate-400 mb-3">
+                    Deshabilitados — {disabled.length}
+                  </h2>
+                  <div className="space-y-2 opacity-60">
+                    {disabled.map((u) => <UserRow key={u.id} u={u} />)}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
       </main>
 
       {/* Modales */}

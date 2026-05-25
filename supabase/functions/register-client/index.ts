@@ -12,7 +12,6 @@ const ok   = (body: object) =>
 const fail = (msg: string) =>
   new Response(JSON.stringify({ success: false, error: msg }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-// Devuelve session tokens haciendo sign-in server-side (evita desfase de propagación)
 async function serverSignIn(email: string, password: string) {
   const anon = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -27,70 +26,33 @@ serve(async (req) => {
 
   try {
     const body = await req.json() as {
-      mode?: "set-password";
+      mode?: "new-user";
       nit_cedula: string;
+      correo: string;
       password: string;
-      empresa?: string;
-      correo?: string;
-      telefono?: string;
-      num_colaboradores?: string;
     };
-    const { mode, nit_cedula, password } = body;
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // ── Modo: solo contraseña para cliente ya registrado ────────────────────
-    if (mode === "set-password") {
-      const { data: clienteRow } = await admin
-        .from("clientes")
-        .select("correo")
-        .eq("nit_cedula", nit_cedula.trim())
-        .maybeSingle();
+    const { nit_cedula, correo, password } = body;
 
-      if (!clienteRow) return fail("NIT/Cédula no encontrado.");
-
-      const { error: authError } = await admin.auth.admin.createUser({
-        email:         clienteRow.correo,
-        password,
-        email_confirm: true,
-      });
-
-      if (authError) {
-        const msg = authError.message.toLowerCase();
-        if (msg.includes("already registered") || msg.includes("already been registered")) {
-          return fail("Ya tienes una cuenta activa. Por favor inicia sesión en la pestaña de inicio de sesión.");
-        }
-        throw authError;
-      }
-
-      const session = await serverSignIn(clienteRow.correo, password);
-      return ok({
-        success:       true,
-        access_token:  session?.access_token  ?? null,
-        refresh_token: session?.refresh_token ?? null,
-      });
-    }
-
-    // ── Modo: registro completo (nuevo cliente) ──────────────────────────────
-    const { empresa, correo, telefono, num_colaboradores } = body;
-
-    // Verificar unicidad del NIT
-    const { data: existingByNit } = await admin
+    // 1. Buscar empresa por NIT
+    const { data: clienteRow } = await admin
       .from("clientes")
-      .select("correo")
+      .select("id, empresa, correo")
       .eq("nit_cedula", nit_cedula.trim())
       .maybeSingle();
 
-    if (existingByNit && existingByNit.correo !== correo) {
-      return fail("Este NIT/Cédula ya está registrado. Si eres tú, ingresa tu correo original o inicia sesión.");
+    if (!clienteRow) {
+      return fail("NIT/Cédula no encontrado. Tu empresa debe estar registrada en VisionBI primero.");
     }
 
-    // Crear usuario en Auth
-    const { error: authError } = await admin.auth.admin.createUser({
-      email:         correo!,
+    // 2. Crear usuario en Auth con el correo del usuario
+    const { data: authData, error: authError } = await admin.auth.admin.createUser({
+      email:         correo.toLowerCase(),
       password,
       email_confirm: true,
     });
@@ -98,33 +60,52 @@ serve(async (req) => {
     if (authError) {
       const msg = authError.message.toLowerCase();
       if (msg.includes("already registered") || msg.includes("already been registered")) {
-        return fail("Este correo ya tiene una cuenta activa. Por favor inicia sesión.");
+        return fail("Este correo ya tiene una cuenta. Por favor inicia sesión.");
       }
       throw authError;
     }
 
-    // Upsert cliente
-    const { error: clienteError } = await admin
-      .from("clientes")
-      .upsert(
-        {
-          empresa,
-          nit_cedula:        nit_cedula.trim(),
-          correo:            correo!.toLowerCase(),
-          telefono,
-          num_colaboradores: num_colaboradores ?? null,
-          updated_at:        new Date().toISOString(),
-        },
-        { onConflict: "correo" }
-      );
-    if (clienteError) throw clienteError;
+    const userId = authData.user!.id;
 
-    // Sign-in server-side para devolver sesión directamente
-    const session = await serverSignIn(correo!, password);
+    // 3. Determinar rol: owner si no hay usuarios activos, pending/viewer si ya hay
+    const { count } = await admin
+      .from("empresa_usuarios")
+      .select("id", { count: "exact", head: true })
+      .eq("cliente_id", clienteRow.id)
+      .eq("status", "active");
+
+    const isFirstUser = (count ?? 0) === 0;
+
+    const { error: euError } = await admin.from("empresa_usuarios").insert({
+      cliente_id:        clienteRow.id,
+      user_id:           userId,
+      correo_usuario:    correo.toLowerCase(),
+      role:              isFirstUser ? "owner" : "viewer",
+      can_book_sessions: isFirstUser,
+      can_view_projects: true,
+      can_view_sessions: isFirstUser,
+      can_edit_company:  isFirstUser,
+      status:            isFirstUser ? "active" : "pending",
+    });
+
+    if (euError) throw euError;
+
+    // 4. Si es owner: devolver sesión directamente
+    if (isFirstUser) {
+      const session = await serverSignIn(correo.toLowerCase(), password);
+      return ok({
+        success:       true,
+        pending:       false,
+        access_token:  session?.access_token  ?? null,
+        refresh_token: session?.refresh_token ?? null,
+      });
+    }
+
+    // 5. Si es pendiente: notificar sin sesión
     return ok({
-      success:       true,
-      access_token:  session?.access_token  ?? null,
-      refresh_token: session?.refresh_token ?? null,
+      success:  true,
+      pending:  true,
+      empresa:  clienteRow.empresa,
     });
 
   } catch (err) {

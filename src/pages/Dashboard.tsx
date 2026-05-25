@@ -2,13 +2,23 @@ import { useState, useEffect } from "react";
 import { useNavigate }         from "react-router-dom";
 import {
   LogOut, CalendarPlus, FolderOpen, User, Save,
-  AlertCircle, CheckCircle2, Pencil,
+  AlertCircle, CheckCircle2, Pencil, Shield,
 } from "lucide-react";
 import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import SessionModal from "@/components/portal/SessionModal";
+
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
+interface EmpresaUsuario {
+  role:              string;
+  can_book_sessions: boolean;
+  can_view_projects: boolean;
+  can_view_sessions: boolean;
+  can_edit_company:  boolean;
+}
 
 interface Cliente {
   id:         string;
@@ -25,11 +35,19 @@ interface Proyecto {
   estado:      string;
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  owner:    "Owner",
+  manager:  "Manager",
+  analista: "Analista",
+  viewer:   "Viewer",
+};
+
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 const Dashboard = () => {
   const navigate = useNavigate();
 
+  const [eu,            setEu]            = useState<EmpresaUsuario | null>(null);
   const [cliente,       setCliente]       = useState<Cliente | null>(null);
   const [proyectos,     setProyectos]     = useState<Proyecto[]>([]);
   const [loading,       setLoading]       = useState(true);
@@ -40,7 +58,7 @@ const Dashboard = () => {
 
   // Perfil editable
   const [editMode,      setEditMode]      = useState(false);
-  const [profileForm,   setProfileForm]   = useState({ empresa: "", telefono: "", correo: "" });
+  const [profileForm,   setProfileForm]   = useState({ empresa: "", telefono: "" });
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg,    setProfileMsg]    = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
@@ -51,25 +69,39 @@ const Dashboard = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { navigate("/portal"); return; }
 
+      // Obtener empresa_usuario con permisos
+      const { data: euData } = await supabase
+        .from("empresa_usuarios")
+        .select("role, can_book_sessions, can_view_projects, can_view_sessions, can_edit_company, cliente_id")
+        .eq("user_id", session.user.id)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (!euData) { navigate("/portal"); return; }
+      setEu(euData);
+
+      // Obtener datos de la empresa
       const { data: cl } = await supabase
         .from("clientes")
         .select("id, empresa, nit_cedula, correo, telefono")
-        .eq("correo", session.user.email!)
+        .eq("id", euData.cliente_id)
         .maybeSingle();
 
       if (!cl) { navigate("/portal"); return; }
-
       setCliente(cl);
-      setProfileForm({ empresa: cl.empresa, telefono: cl.telefono, correo: cl.correo });
+      setProfileForm({ empresa: cl.empresa, telefono: cl.telefono });
 
-      const { data: proy } = await supabase
-        .from("proyectos")
-        .select("id, nombre, descripcion, estado")
-        .eq("cliente_id", cl.id)
-        .eq("estado", "activo")
-        .order("created_at", { ascending: false });
+      // Proyectos (solo si tiene permiso)
+      if (euData.can_view_projects) {
+        const { data: proy } = await supabase
+          .from("proyectos")
+          .select("id, nombre, descripcion, estado")
+          .eq("cliente_id", cl.id)
+          .eq("estado", "activo")
+          .order("created_at", { ascending: false });
+        setProyectos(proy ?? []);
+      }
 
-      setProyectos(proy ?? []);
       setLoading(false);
     };
     load();
@@ -119,6 +151,11 @@ const Dashboard = () => {
     );
   }
 
+  const tabs = [
+    ...(eu?.can_view_projects ? [{ key: "proyectos" as const, label: "Mis proyectos", icon: FolderOpen }] : []),
+    { key: "perfil" as const, label: "Mi perfil", icon: User },
+  ];
+
   return (
     <div className="min-h-screen bg-slate-50">
 
@@ -132,9 +169,15 @@ const Dashboard = () => {
               className="h-9 object-contain"
               onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
             />
-            <span className="text-sm font-semibold text-[#1a3461] hidden sm:block">
-              {cliente?.empresa}
-            </span>
+            <div className="hidden sm:flex flex-col">
+              <span className="text-sm font-semibold text-[#1a3461] leading-tight">{cliente?.empresa}</span>
+              {eu && (
+                <span className="text-xs text-slate-400 flex items-center gap-1">
+                  <Shield className="h-3 w-3" />
+                  {ROLE_LABELS[eu.role] ?? eu.role}
+                </span>
+              )}
+            </div>
           </div>
           <Button
             variant="ghost"
@@ -150,10 +193,7 @@ const Dashboard = () => {
       {/* Nav tabs */}
       <div className="bg-white border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-4 flex gap-1">
-          {([
-            { key: "proyectos", label: "Mis proyectos", icon: FolderOpen },
-            { key: "perfil",    label: "Mi perfil",     icon: User },
-          ] as const).map(({ key, label, icon: Icon }) => (
+          {tabs.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
@@ -172,17 +212,15 @@ const Dashboard = () => {
       <main className="max-w-5xl mx-auto px-4 py-8">
 
         {/* ── Proyectos ── */}
-        {activeTab === "proyectos" && (
+        {activeTab === "proyectos" && eu?.can_view_projects && (
           <div>
             <h2 className="text-lg font-bold text-[#1a3461] mb-6">Proyectos activos</h2>
 
             {proyectos.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-xl border border-slate-200">
                 <FolderOpen className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500 font-medium">No tienes proyectos activos</p>
-                <p className="text-slate-400 text-sm mt-1">
-                  Contacta a VisionBI para iniciar un proyecto.
-                </p>
+                <p className="text-slate-500 font-medium">No hay proyectos activos</p>
+                <p className="text-slate-400 text-sm mt-1">Contacta a VisionBI para iniciar un proyecto.</p>
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
@@ -202,13 +240,17 @@ const Dashboard = () => {
                         Activo
                       </span>
                     </div>
-                    <Button
-                      size="sm"
-                      className="w-full bg-[#1a3461] hover:bg-[#15294f] text-white gap-2 mt-1"
-                      onClick={() => setSessionModal({ open: true, proyecto: p })}
-                    >
-                      <CalendarPlus className="h-4 w-4" /> Agendar sesión
-                    </Button>
+                    {eu?.can_book_sessions ? (
+                      <Button
+                        size="sm"
+                        className="w-full bg-[#1a3461] hover:bg-[#15294f] text-white gap-2 mt-1"
+                        onClick={() => setSessionModal({ open: true, proyecto: p })}
+                      >
+                        <CalendarPlus className="h-4 w-4" /> Agendar sesión
+                      </Button>
+                    ) : (
+                      <p className="text-xs text-slate-400 text-center mt-2">Sin permiso para reservar sesiones</p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -221,7 +263,7 @@ const Dashboard = () => {
           <div className="max-w-lg">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-[#1a3461]">Mi información</h2>
-              {!editMode && (
+              {!editMode && eu?.can_edit_company && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -249,7 +291,6 @@ const Dashboard = () => {
 
             <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
 
-              {/* Empresa */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Empresa</Label>
                 {editMode ? (
@@ -262,20 +303,17 @@ const Dashboard = () => {
                 )}
               </div>
 
-              {/* NIT (inmutable) */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">NIT / Cédula</Label>
                 <p className="text-sm font-medium text-slate-800">{cliente.nit_cedula}</p>
                 <p className="text-xs text-slate-400">No modificable.</p>
               </div>
 
-              {/* Correo (inmutable por ahora) */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Correo electrónico</Label>
+                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Correo de contacto</Label>
                 <p className="text-sm font-medium text-slate-800">{cliente.correo}</p>
               </div>
 
-              {/* Teléfono */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Teléfono</Label>
                 {editMode ? (
@@ -288,6 +326,11 @@ const Dashboard = () => {
                 )}
               </div>
 
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tu rol</Label>
+                <p className="text-sm font-medium text-slate-800">{ROLE_LABELS[eu?.role ?? ""] ?? eu?.role}</p>
+              </div>
+
               {editMode && (
                 <div className="flex gap-3 pt-2">
                   <Button
@@ -295,7 +338,7 @@ const Dashboard = () => {
                     className="flex-1"
                     onClick={() => {
                       setEditMode(false);
-                      setProfileForm({ empresa: cliente.empresa, telefono: cliente.telefono, correo: cliente.correo });
+                      setProfileForm({ empresa: cliente.empresa, telefono: cliente.telefono });
                     }}
                   >
                     Cancelar

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Eye, EyeOff, LogIn, UserPlus, AlertCircle, CheckCircle2, ChevronLeft } from "lucide-react";
+import { Eye, EyeOff, LogIn, UserPlus, AlertCircle, CheckCircle2, ChevronLeft, Clock } from "lucide-react";
 import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
@@ -12,50 +12,26 @@ import {
 } from "@/components/ui/form";
 import { supabase } from "@/lib/supabase";
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
-
-const COLABORADORES_OPTIONS = [
-  "1 – 10",
-  "11 – 50",
-  "51 – 200",
-  "201 – 500",
-  "Más de 500",
-];
-
 // ─── Esquemas ─────────────────────────────────────────────────────────────────
 
 const loginSchema = z.object({
-  nit_cedula: z.string().min(5, "Ingresa tu NIT o cédula"),
-  password:   z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  correo:   z.string().email("Ingresa un correo electrónico válido"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
 });
 
-const setPassSchema = z.object({
-  password:         z.string().min(8, "Mínimo 8 caracteres"),
+const registerSchema = z.object({
+  correo:          z.string().email("Correo electrónico inválido"),
+  password:        z.string().min(8, "Mínimo 8 caracteres"),
   confirm_password: z.string(),
 }).refine((d) => d.password === d.confirm_password, {
   message: "Las contraseñas no coinciden",
   path:    ["confirm_password"],
 });
 
-const registerSchema = z.object({
-  empresa:           z.string().min(2, "Ingresa el nombre de tu empresa"),
-  nit_cedula:        z.string().min(5, "Ingresa el NIT o cédula sin dígito de verificación"),
-  correo:            z.string().email("Correo electrónico inválido"),
-  telefono:          z.string().min(7, "Ingresa un teléfono válido"),
-  num_colaboradores: z.string().min(1, "Selecciona el número de colaboradores"),
-  password:          z.string().min(8, "Mínimo 8 caracteres"),
-  confirm_password:  z.string(),
-}).refine((d) => d.password === d.confirm_password, {
-  message: "Las contraseñas no coinciden",
-  path:    ["confirm_password"],
-});
-
 type LoginValues    = z.infer<typeof loginSchema>;
-type SetPassValues  = z.infer<typeof setPassSchema>;
 type RegisterValues = z.infer<typeof registerSchema>;
 
-// Etapas del flujo de registro
-type RegStage = "nit" | "set-password" | "full";
+type RegStage = "nit" | "data" | "pending";
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
@@ -66,79 +42,84 @@ const Portal = () => {
   const [error,       setError]       = useState<string | null>(null);
   const [showPass,    setShowPass]    = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [loginSuggestRegister, setLoginSuggestRegister] = useState(false);
 
   // Estado del flujo de registro
-  const [regStage,      setRegStage]      = useState<RegStage>("nit");
-  const [regNit,        setRegNit]        = useState("");
-  const [regNitError,   setRegNitError]   = useState<string | null>(null);
-  const [regFoundEmail, setRegFoundEmail] = useState("");
-  const [regChecking,   setRegChecking]   = useState(false);
+  const [regStage,    setRegStage]    = useState<RegStage>("nit");
+  const [regNit,      setRegNit]      = useState("");
+  const [regNitError, setRegNitError] = useState<string | null>(null);
+  const [regChecking, setRegChecking] = useState(false);
+  const [regEmpresa,  setRegEmpresa]  = useState("");
+  const [pendingMsg,  setPendingMsg]  = useState("");
 
   // ── Formularios ────────────────────────────────────────────────────────────
 
   const loginForm = useForm<LoginValues>({
     resolver:      zodResolver(loginSchema),
-    defaultValues: { nit_cedula: "", password: "" },
-  });
-
-  const setPassForm = useForm<SetPassValues>({
-    resolver:      zodResolver(setPassSchema),
-    defaultValues: { password: "", confirm_password: "" },
+    defaultValues: { correo: "", password: "" },
   });
 
   const registerForm = useForm<RegisterValues>({
     resolver:      zodResolver(registerSchema),
-    defaultValues: {
-      empresa: "", nit_cedula: "", correo: "", telefono: "",
-      num_colaboradores: "", password: "", confirm_password: "",
-    },
+    defaultValues: { correo: "", password: "", confirm_password: "" },
   });
 
   // ── Cambio de pestaña ──────────────────────────────────────────────────────
 
-  const handleTabChange = (t: "login" | "register", prefillNit?: string) => {
+  const handleTabChange = (t: "login" | "register") => {
     setTab(t);
     setError(null);
-    setLoginSuggestRegister(false);
     if (t === "register") {
       setRegStage("nit");
       setRegNit("");
       setRegNitError(null);
-      setRegFoundEmail("");
+      setRegEmpresa("");
       setShowPass(false);
       setShowConfirm(false);
-      setPassForm.reset();
       registerForm.reset();
-      if (prefillNit) setRegNit(prefillNit);
     }
   };
 
-  // ── Login ──────────────────────────────────────────────────────────────────
+  // ── Login (email + contraseña) ─────────────────────────────────────────────
 
   const onLogin = async (values: LoginValues) => {
     setLoading(true);
     setError(null);
-    setLoginSuggestRegister(false);
     try {
-      const { data: lookupData, error: lookupError } = await supabase.functions.invoke<{ correo: string }>(
-        "lookup-nit",
-        { body: { nit_cedula: values.nit_cedula } }
-      );
-      if (lookupError || !lookupData?.correo) {
-        setError("NIT/Cédula no encontrado. Verifica el número o regístrate.");
-        return;
-      }
       const { error: authError } = await supabase.auth.signInWithPassword({
-        email:    lookupData.correo,
+        email:    values.correo.toLowerCase(),
         password: values.password,
       });
       if (authError) {
-        // El cliente existe en la BD pero el login falló: puede que nunca haya creado contraseña
-        setError("Credenciales incorrectas.");
-        setLoginSuggestRegister(true);
+        setError("Credenciales incorrectas. Verifica tu correo y contraseña.");
         return;
       }
+
+      // Verificar que el usuario tenga empresa_usuario activo
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setError("Error al iniciar sesión."); return; }
+
+      const { data: eu } = await supabase
+        .from("empresa_usuarios")
+        .select("status")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+
+      if (!eu) {
+        await supabase.auth.signOut();
+        setError("Tu cuenta no está asociada a ninguna empresa. Regístrate primero.");
+        return;
+      }
+      if (eu.status === "pending") {
+        await supabase.auth.signOut();
+        setError("Tu cuenta está pendiente de aprobación. Contacta a tu administrador o a VisionBI.");
+        return;
+      }
+      if (eu.status === "disabled") {
+        await supabase.auth.signOut();
+        setError("Tu cuenta ha sido deshabilitada. Contacta a VisionBI.");
+        return;
+      }
+
       navigate("/portal/dashboard");
     } catch {
       setError("Error al iniciar sesión. Intenta de nuevo.");
@@ -147,7 +128,7 @@ const Portal = () => {
     }
   };
 
-  // ── Registro: paso 1 — verificar NIT ──────────────────────────────────────
+  // ── Registro paso 1: verificar NIT ────────────────────────────────────────
 
   const handleNitCheck = async () => {
     const nit = regNit.trim();
@@ -158,17 +139,18 @@ const Portal = () => {
     setRegChecking(true);
     setRegNitError(null);
     try {
-      const { data } = await supabase.functions.invoke<{ correo: string }>(
-        "lookup-nit",
-        { body: { nit_cedula: nit } }
-      );
-      if (data?.correo) {
-        setRegFoundEmail(data.correo);
-        setRegStage("set-password");
-      } else {
-        registerForm.setValue("nit_cedula", nit);
-        setRegStage("full");
+      const { data } = await supabase
+        .from("clientes")
+        .select("empresa")
+        .eq("nit_cedula", nit)
+        .maybeSingle();
+
+      if (!data) {
+        setRegNitError("NIT/Cédula no encontrado. Tu empresa debe estar registrada en VisionBI primero.");
+        return;
       }
+      setRegEmpresa(data.empresa);
+      setRegStage("data");
     } catch {
       setRegNitError("Error al verificar. Intenta de nuevo.");
     } finally {
@@ -176,70 +158,40 @@ const Portal = () => {
     }
   };
 
-  // ── Registro: paso 2a — solo contraseña (cliente existente) ───────────────
-
-  const onSetPassword = async (values: SetPassValues) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data } = await supabase.functions.invoke<{
-        success: boolean; error?: string;
-        access_token?: string; refresh_token?: string;
-      }>("register-client", {
-        body: { mode: "set-password", nit_cedula: regNit, password: values.password },
-      });
-      if (!data?.success) {
-        setError(data?.error ?? "Error al crear la cuenta.");
-        return;
-      }
-      if (data.access_token && data.refresh_token) {
-        await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
-        navigate("/portal/dashboard");
-        return;
-      }
-      // Fallback si el servidor no devolvió sesión
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email: regFoundEmail, password: values.password,
-      });
-      if (!authError) { navigate("/portal/dashboard"); return; }
-      setError("Cuenta creada. Por favor inicia sesión.");
-      handleTabChange("login");
-    } catch {
-      setError("Error al crear la cuenta. Intenta de nuevo.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ── Registro: paso 2b — formulario completo (cliente nuevo) ───────────────
+  // ── Registro paso 2: datos del usuario ───────────────────────────────────
 
   const onRegister = async (values: RegisterValues) => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await supabase.functions.invoke<{
-        success: boolean; error?: string;
+      const { data, error: fnError } = await supabase.functions.invoke<{
+        success: boolean; error?: string; pending?: boolean; empresa?: string;
         access_token?: string; refresh_token?: string;
       }>("register-client", {
         body: {
-          empresa:           values.empresa,
-          nit_cedula:        values.nit_cedula,
-          correo:            values.correo,
-          telefono:          values.telefono,
-          num_colaboradores: values.num_colaboradores,
-          password:          values.password,
+          nit_cedula: regNit.trim(),
+          correo:     values.correo,
+          password:   values.password,
         },
       });
-      if (!data?.success) {
-        setError(data?.error ?? "Error al registrarse.");
+
+      if (fnError || !data?.success) {
+        setError(data?.error ?? "Error al crear la cuenta.");
         return;
       }
+
+      if (data.pending) {
+        setPendingMsg(data.empresa ?? regEmpresa);
+        setRegStage("pending");
+        return;
+      }
+
       if (data.access_token && data.refresh_token) {
         await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
         navigate("/portal/dashboard");
         return;
       }
-      // Fallback si el servidor no devolvió sesión
+
       const { error: authError } = await supabase.auth.signInWithPassword({
         email: values.correo, password: values.password,
       });
@@ -247,7 +199,7 @@ const Portal = () => {
       setError("Cuenta creada. Por favor inicia sesión.");
       handleTabChange("login");
     } catch {
-      setError("Error al registrarse. Intenta de nuevo.");
+      setError("Error al crear la cuenta. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -270,7 +222,6 @@ const Portal = () => {
           <p className="text-slate-500 text-sm">Portal de Clientes</p>
         </div>
 
-        {/* Card */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
 
           {/* Tabs */}
@@ -301,35 +252,24 @@ const Portal = () => {
           <div className="p-7">
 
             {error && (
-              <div className="flex flex-col gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 mb-5">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                  {error}
-                </div>
-                {loginSuggestRegister && (
-                  <button
-                    type="button"
-                    onClick={() => handleTabChange("register", loginForm.getValues("nit_cedula"))}
-                    className="text-left text-[#1a3461] font-semibold underline text-xs"
-                  >
-                    ¿Aún no tienes contraseña? → Ir a Registrarse para crearla
-                  </button>
-                )}
+              <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 mb-5">
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                {error}
               </div>
             )}
 
-            {/* ── Formulario Login ── */}
+            {/* ── Login ── */}
             {tab === "login" && (
               <Form {...loginForm}>
                 <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
                   <FormField
                     control={loginForm.control}
-                    name="nit_cedula"
+                    name="correo"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>NIT / Cédula</FormLabel>
+                        <FormLabel>Correo electrónico</FormLabel>
                         <FormControl>
-                          <Input placeholder="900123456" {...field} />
+                          <Input type="email" placeholder="tu@empresa.com" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -376,11 +316,11 @@ const Portal = () => {
             {tab === "register" && (
               <div className="space-y-5">
 
-                {/* Etapa 1: verificar NIT */}
+                {/* Paso 1: verificar NIT */}
                 {regStage === "nit" && (
                   <div className="space-y-4">
                     <p className="text-sm text-slate-500">
-                      Primero verificamos si ya tienes cuenta con tu NIT o cédula.
+                      Ingresa el NIT de tu empresa para verificar que está registrada en VisionBI.
                     </p>
                     <div className="space-y-1.5">
                       <Label>NIT / Cédula</Label>
@@ -408,26 +348,34 @@ const Portal = () => {
                   </div>
                 )}
 
-                {/* Etapa 2a: cliente existente → solo contraseña */}
-                {regStage === "set-password" && (
+                {/* Paso 2: datos del usuario */}
+                {regStage === "data" && (
                   <div className="space-y-4">
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
                       <CheckCircle2 className="h-5 w-5 text-[#1a3461] mt-0.5 flex-shrink-0" />
                       <div>
-                        <p className="text-sm font-semibold text-[#1a3461]">¡Ya eres cliente de VisionBI!</p>
-                        <p className="text-sm text-slate-600 mt-1">
-                          Tu NIT ya está en nuestro sistema. Solo necesitas crear una contraseña para acceder al portal.
-                        </p>
-                        <p className="text-xs text-slate-500 mt-2">
-                          Cuenta: <span className="font-medium">{regFoundEmail}</span>
-                        </p>
+                        <p className="text-sm font-semibold text-[#1a3461]">{regEmpresa}</p>
+                        <p className="text-sm text-slate-600 mt-0.5">Empresa encontrada. Crea tu acceso personal.</p>
                       </div>
                     </div>
 
-                    <Form {...setPassForm}>
-                      <form onSubmit={setPassForm.handleSubmit(onSetPassword)} className="space-y-4">
+                    <Form {...registerForm}>
+                      <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
                         <FormField
-                          control={setPassForm.control}
+                          control={registerForm.control}
+                          name="correo"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Tu correo electrónico</FormLabel>
+                              <FormControl>
+                                <Input type="email" placeholder="tu@empresa.com" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={registerForm.control}
                           name="password"
                           render={({ field }) => (
                             <FormItem>
@@ -453,7 +401,7 @@ const Portal = () => {
                           )}
                         />
                         <FormField
-                          control={setPassForm.control}
+                          control={registerForm.control}
                           name="confirm_password"
                           render={({ field }) => (
                             <FormItem>
@@ -478,7 +426,7 @@ const Portal = () => {
                             </FormItem>
                           )}
                         />
-                        <div className="flex gap-3">
+                        <div className="flex gap-3 pt-1">
                           <Button
                             type="button"
                             variant="outline"
@@ -492,7 +440,7 @@ const Portal = () => {
                             className="flex-1 bg-[#1a3461] hover:bg-[#15294f] text-white"
                             disabled={loading}
                           >
-                            {loading ? "Creando..." : "Crear contraseña"}
+                            {loading ? "Creando..." : "Crear acceso"}
                           </Button>
                         </div>
                       </form>
@@ -500,158 +448,31 @@ const Portal = () => {
                   </div>
                 )}
 
-                {/* Etapa 2b: cliente nuevo → formulario completo */}
-                {regStage === "full" && (
-                  <Form {...registerForm}>
-                    <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
-
-                      <FormField
-                        control={registerForm.control}
-                        name="empresa"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Empresa</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Nombre de tu empresa" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {/* NIT pre-llenado, solo lectura */}
-                      <div className="space-y-1.5">
-                        <Label className="text-sm font-medium">NIT / Cédula</Label>
-                        <div className="flex h-10 items-center rounded-md border bg-muted/50 px-3 text-sm text-foreground">
-                          {regNit}
-                        </div>
+                {/* Paso 3: pendiente de aprobación */}
+                {regStage === "pending" && (
+                  <div className="space-y-4 text-center">
+                    <div className="flex justify-center">
+                      <div className="bg-amber-50 border border-amber-200 rounded-full p-4">
+                        <Clock className="h-8 w-8 text-amber-500" />
                       </div>
-
-                      <FormField
-                        control={registerForm.control}
-                        name="correo"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Correo electrónico</FormLabel>
-                            <FormControl>
-                              <Input type="email" placeholder="tu@empresa.com" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={registerForm.control}
-                        name="telefono"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Teléfono</FormLabel>
-                            <FormControl>
-                              <Input type="tel" placeholder="300 000 0000" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={registerForm.control}
-                        name="num_colaboradores"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Número de colaboradores</FormLabel>
-                            <FormControl>
-                              <select
-                                value={field.value}
-                                onChange={(e) => field.onChange(e.target.value)}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <option value="">Selecciona el rango</option>
-                                {COLABORADORES_OPTIONS.map((opt) => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={registerForm.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Contraseña</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Input
-                                  type={showPass ? "text" : "password"}
-                                  placeholder="Mínimo 8 caracteres"
-                                  {...field}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowPass((p) => !p)}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                                >
-                                  {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                </button>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={registerForm.control}
-                        name="confirm_password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Confirmar contraseña</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Input
-                                  type={showConfirm ? "text" : "password"}
-                                  placeholder="Repite tu contraseña"
-                                  {...field}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowConfirm((p) => !p)}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                                >
-                                  {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                </button>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <div className="flex gap-3 pt-1">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => setRegStage("nit")}
-                        >
-                          <ChevronLeft className="h-4 w-4 mr-1" /> Atrás
-                        </Button>
-                        <Button
-                          type="submit"
-                          className="flex-1 bg-[#1a3461] hover:bg-[#15294f] text-white"
-                          disabled={loading}
-                        >
-                          {loading ? "Creando cuenta..." : "Crear cuenta"}
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-[#1a3461]">Solicitud enviada</p>
+                      <p className="text-sm text-slate-500 mt-2">
+                        Tu solicitud para unirte a <strong>{pendingMsg}</strong> está pendiente de aprobación.
+                        Un administrador revisará tu acceso y te notificará.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => handleTabChange("login")}
+                    >
+                      Ir a iniciar sesión
+                    </Button>
+                  </div>
                 )}
+
               </div>
             )}
 
