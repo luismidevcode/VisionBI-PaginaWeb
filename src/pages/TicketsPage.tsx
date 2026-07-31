@@ -205,6 +205,7 @@ const TicketsPage = () => {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-mono text-slate-400 shrink-0">{t.codigo}</span>
                       <p className="text-sm font-semibold text-slate-800 truncate">{t.titulo}</p>
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${ESTADO_COLOR[t.estado]}`}>
                         {ESTADO_LABELS[t.estado]}
@@ -216,7 +217,11 @@ const TicketsPage = () => {
 
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 mt-1.5 text-xs text-slate-400">
                       <span>{t.proyecto?.nombre}</span>
-                      <span>{new Date(t.created_at).toLocaleDateString("es-CO", { day: "numeric", month: "short" })}</span>
+                      <span>
+                        {new Date(t.created_at).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}
+                        {" "}
+                        {new Date(t.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
                     </div>
                   </div>
                 </div>

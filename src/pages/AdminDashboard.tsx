@@ -808,7 +808,7 @@ const AdminDashboard = () => {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200">
-                        {["Cliente", "Proyecto", "Título", "Prioridad", "Estado", "Asignado", ""].map((h) => (
+                        {["Código", "Cliente", "Proyecto", "Título", "Prioridad", "Estado", "Fecha", "Asignado", ""].map((h) => (
                           <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
                             {h}
                           </th>
@@ -818,6 +818,7 @@ const AdminDashboard = () => {
                     <tbody className="divide-y divide-slate-100">
                       {filtered.map((t) => (
                         <tr key={t.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="px-4 py-3 text-slate-500 text-xs font-mono whitespace-nowrap">{t.codigo}</td>
                           <td className="px-4 py-3 text-slate-600 text-xs whitespace-nowrap">{t.empresa}</td>
                           <td className="px-4 py-3 text-slate-600 text-xs whitespace-nowrap">{t.proyecto?.nombre ?? "—"}</td>
                           <td className="px-4 py-3">
@@ -837,6 +838,11 @@ const AdminDashboard = () => {
                             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ESTADO_COLOR[t.estado]}`}>
                               {ESTADO_LABELS[t.estado]}
                             </span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
+                            {new Date(t.created_at).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}
+                            {" "}
+                            {new Date(t.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
                           </td>
                           <td className="px-4 py-3">
                             <select

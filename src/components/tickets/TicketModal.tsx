@@ -18,6 +18,7 @@ import {
 
 export interface Ticket {
   id:          string;
+  codigo:      string;
   titulo:      string;
   descripcion: string | null;
   prioridad:   Prioridad;
@@ -317,6 +318,9 @@ export const TicketModal = ({
           <DialogTitle className="text-[#1a3461]">
             {isCreate ? "Nuevo ticket" : ticket?.titulo ?? "…"}
           </DialogTitle>
+          {!isCreate && ticket?.codigo && (
+            <p className="text-xs text-slate-400 font-mono -mt-1">{ticket.codigo}</p>
+          )}
         </DialogHeader>
 
         {error && (
@@ -450,6 +454,8 @@ export const TicketModal = ({
                     <span className="font-semibold uppercase tracking-wide">Creado</span>
                     <p className="mt-0.5 text-slate-700">
                       {new Date(ticket.created_at).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}
+                      {" "}
+                      {new Date(ticket.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>
                   {ticket.resolved_at && (
