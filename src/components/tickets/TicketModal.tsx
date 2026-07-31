@@ -8,9 +8,10 @@ import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import {
-  Estado, Prioridad,
+  Estado, Prioridad, EstimacionEstado,
   puedeTransicionar, transicionesDisponibles,
-  ESTADO_LABELS, PRIORIDAD_LABELS, ESTADO_COLOR, PRIORIDAD_COLOR,
+  requiereEstimacion, estimacionBloqueaInicio,
+  ESTADO_LABELS, PRIORIDAD_LABELS, ESTADO_COLOR, PRIORIDAD_COLOR, ESTIMACION_ESTADO_LABELS,
 } from "@/lib/ticketStateMachine";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -29,6 +30,9 @@ export interface Ticket {
   created_at:  string;
   updated_at:  string;
   proyecto:    { nombre: string } | null;
+  estimacion_horas:              number | null;
+  estimacion_estado:             EstimacionEstado;
+  estimacion_comentario_rechazo: string | null;
 }
 
 export interface Miembro {
@@ -114,6 +118,11 @@ export const TicketModal = ({
   const [assigning,      setAssigning]      = useState(false);
   const [error,          setError]          = useState<string | null>(null);
   const [uploadingFile,  setUploadingFile]  = useState(false);
+  const [horasEstimacion,   setHorasEstimacion]   = useState("");
+  const [estimando,         setEstimando]         = useState(false);
+  const [rechazoComentario, setRechazoComentario] = useState("");
+  const [showRechazoInput,  setShowRechazoInput]  = useState(false);
+  const [aprobando,         setAprobando]         = useState(false);
 
   // ── Reset al abrir ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -131,6 +140,7 @@ export const TicketModal = ({
   const loadTicket = async () => {
     if (!ticketId) return;
     setLoading(true);
+    setHorasEstimacion(""); setRechazoComentario(""); setShowRechazoInput(false);
     const [{ data: t }, { data: act }, { data: adj }] = await Promise.all([
       supabase.from("tickets").select("*, proyecto:proyectos(nombre)").eq("id", ticketId).single(),
       supabase.from("ticket_actividad").select("*").eq("ticket_id", ticketId).order("created_at"),
@@ -213,6 +223,47 @@ export const TicketModal = ({
     }
   };
 
+  // ── Estimación de horas ───────────────────────────────────────────────────
+  const handleSetEstimacion = async () => {
+    if (!ticket) return;
+    const horas = Number(horasEstimacion);
+    if (!Number.isFinite(horas) || horas <= 0) { setError("Ingresa un número de horas válido."); return; }
+    setEstimando(true); setError(null);
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke<{ success: boolean; ticket: Ticket; error?: string }>(
+        "ticket-action",
+        { body: { action: "set-estimacion", ticket_id: ticket.id, horas } },
+      );
+      if (fnErr || !data?.success) { setError(data?.error ?? "Error al enviar la estimación."); return; }
+      setTicket(data.ticket);
+      onUpdated(data.ticket);
+      setHorasEstimacion("");
+      await loadTicket();
+    } finally {
+      setEstimando(false);
+    }
+  };
+
+  const handleApproveEstimacion = async (aprobado: boolean) => {
+    if (!ticket) return;
+    if (!aprobado && !rechazoComentario.trim()) { setError("Debes indicar un motivo de rechazo."); return; }
+    setAprobando(true); setError(null);
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke<{ success: boolean; ticket: Ticket; error?: string }>(
+        "ticket-action",
+        { body: { action: "approve-estimacion", ticket_id: ticket.id, aprobado, comentario: aprobado ? undefined : rechazoComentario.trim() } },
+      );
+      if (fnErr || !data?.success) { setError(data?.error ?? "Error al procesar la estimación."); return; }
+      setTicket(data.ticket);
+      onUpdated(data.ticket);
+      setRechazoComentario("");
+      setShowRechazoInput(false);
+      await loadTicket();
+    } finally {
+      setAprobando(false);
+    }
+  };
+
   // ── Comentar ──────────────────────────────────────────────────────────────
   const handleComment = async () => {
     if (!comentario.trim() || !ticket) return;
@@ -256,7 +307,8 @@ export const TicketModal = ({
     : false;
 
   const canStart = ticket?.estado === "abierto" &&
-    puedeTransicionar("abierto", "en_progreso", myUserId, ticket.creador_id, ticket.asignado_id, esAdmin).permitido;
+    puedeTransicionar("abierto", "en_progreso", myUserId, ticket.creador_id, ticket.asignado_id, esAdmin).permitido &&
+    !estimacionBloqueaInicio(ticket.prioridad, ticket.estimacion_estado);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -410,6 +462,113 @@ export const TicketModal = ({
                   )}
                 </div>
 
+                {/* Estimación de horas (tickets críticos) */}
+                {requiereEstimacion(ticket.prioridad) && ticket.estado === "abierto" && (
+                  <div className="rounded-lg border border-slate-200 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Estimación de horas</span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        ticket.estimacion_estado === "aceptada"    ? "bg-green-50 text-green-700 border border-green-200" :
+                        ticket.estimacion_estado === "rechazada"   ? "bg-red-50 text-red-700 border border-red-200" :
+                        ticket.estimacion_estado === "en_revision" ? "bg-blue-50 text-blue-700 border border-blue-200" :
+                                                                      "bg-yellow-50 text-yellow-700 border border-yellow-200"
+                      }`}>
+                        {ESTIMACION_ESTADO_LABELS[ticket.estimacion_estado]}
+                      </span>
+                    </div>
+
+                    {ticket.estimacion_estado === "rechazada" && ticket.estimacion_comentario_rechazo && (
+                      <p className="text-xs text-red-700 bg-red-50 rounded p-2">
+                        Motivo del rechazo: {ticket.estimacion_comentario_rechazo}
+                      </p>
+                    )}
+
+                    {(ticket.estimacion_estado === "pendiente" || ticket.estimacion_estado === "rechazada") && (
+                      myUserId === ticket.asignado_id ? (
+                        <div className="flex gap-2">
+                          <Input
+                            type="number" min="0.5" step="0.5"
+                            placeholder="Horas estimadas"
+                            value={horasEstimacion}
+                            onChange={(e) => setHorasEstimacion(e.target.value)}
+                            className="text-sm"
+                          />
+                          <Button
+                            size="sm" className="bg-[#1a3461] hover:bg-[#15294f] text-white shrink-0"
+                            onClick={handleSetEstimacion} disabled={estimando}
+                          >
+                            {estimando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Enviar"}
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500">Esperando que el asignado proponga una estimación de horas.</p>
+                      )
+                    )}
+
+                    {ticket.estimacion_estado === "en_revision" && (
+                      <>
+                        <p className="text-xs text-slate-600">
+                          El asignado propuso <strong>{ticket.estimacion_horas} horas</strong>.
+                        </p>
+                        {myUserId === ticket.creador_id ? (
+                          showRechazoInput ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={rechazoComentario}
+                                onChange={(e) => setRechazoComentario(e.target.value)}
+                                rows={2}
+                                placeholder="Motivo del rechazo…"
+                                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#1a3461]/20"
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm" variant="outline"
+                                  onClick={() => { setShowRechazoInput(false); setRechazoComentario(""); }}
+                                  disabled={aprobando}
+                                >
+                                  Cancelar
+                                </Button>
+                                <Button
+                                  size="sm" className="bg-red-600 hover:bg-red-700 text-white"
+                                  onClick={() => handleApproveEstimacion(false)}
+                                  disabled={aprobando || !rechazoComentario.trim()}
+                                >
+                                  {aprobando ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+                                  Confirmar rechazo
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm" className="bg-green-600 hover:bg-green-700 text-white"
+                                onClick={() => handleApproveEstimacion(true)} disabled={aprobando}
+                              >
+                                {aprobando ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+                                Aceptar
+                              </Button>
+                              <Button
+                                size="sm" variant="outline" className="border-red-300 text-red-700"
+                                onClick={() => setShowRechazoInput(true)} disabled={aprobando}
+                              >
+                                Rechazar
+                              </Button>
+                            </div>
+                          )
+                        ) : (
+                          <p className="text-xs text-slate-500">Esperando la aprobación del creador.</p>
+                        )}
+                      </>
+                    )}
+
+                    {ticket.estimacion_estado === "aceptada" && (
+                      <p className="text-xs text-green-700">
+                        Estimación aceptada: <strong>{ticket.estimacion_horas} horas</strong>. Ya puedes iniciar el progreso.
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Transiciones */}
                 {ticket.estado !== "cerrado" && (canTransitionToNext) && (
                   <div className="flex gap-2 pt-1">
@@ -542,6 +701,23 @@ export const TicketModal = ({
                             <span>
                               <strong className="text-slate-700">{autor}</strong>
                               {" asignó a "}<strong className="text-slate-700">{emailOf(c.asignado_nuevo, miembros, myUserId)}</strong>
+                              {" · "}{fecha}
+                            </span>
+                          </div>
+                        );
+                      }
+                      if (a.tipo === "estimacion") {
+                        const c = a.contenido as { accion: string; horas: number; comentario?: string };
+                        const texto =
+                          c.accion === "propuesta" ? `propuso una estimación de ${c.horas} horas` :
+                          c.accion === "aceptada"  ? `aceptó la estimación de ${c.horas} horas` :
+                          `rechazó la estimación de ${c.horas} horas${c.comentario ? ` ("${c.comentario}")` : ""}`;
+                        return (
+                          <div key={a.id} className="flex items-center gap-2 text-xs text-slate-500">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0" />
+                            <span>
+                              <strong className="text-slate-700">{autor}</strong>
+                              {" "}{texto}
                               {" · "}{fecha}
                             </span>
                           </div>

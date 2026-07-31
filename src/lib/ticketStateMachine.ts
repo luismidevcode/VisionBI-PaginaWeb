@@ -1,5 +1,6 @@
 export type Estado    = "abierto" | "en_progreso" | "resuelto" | "cerrado";
 export type Prioridad = "baja" | "media" | "alta" | "critica";
+export type EstimacionEstado = "no_requerida" | "pendiente" | "en_revision" | "aceptada" | "rechazada";
 
 type QuienPuede = "asignado" | "creador_o_admin";
 
@@ -58,6 +59,24 @@ export function puedeTransicionar(
 export function transicionesDisponibles(estado: Estado): Estado[] {
   return (TRANSICIONES[estado] ?? []).map((t) => t.to);
 }
+
+/** Los tickets críticos requieren una estimación de horas aceptada por el creador antes de iniciar progreso. */
+export function requiereEstimacion(prioridad: Prioridad): boolean {
+  return prioridad === "critica";
+}
+
+/** True cuando el ticket aún no puede pasar a "en_progreso" porque falta la estimación de horas. */
+export function estimacionBloqueaInicio(prioridad: Prioridad, estimacionEstado: EstimacionEstado): boolean {
+  return requiereEstimacion(prioridad) && estimacionEstado !== "aceptada";
+}
+
+export const ESTIMACION_ESTADO_LABELS: Record<EstimacionEstado, string> = {
+  no_requerida: "No requerida",
+  pendiente:    "Pendiente de propuesta",
+  en_revision:  "En revisión",
+  aceptada:     "Aceptada",
+  rechazada:    "Rechazada",
+};
 
 export const ESTADO_LABELS: Record<Estado, string> = {
   abierto:     "Abierto",

@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   puedeTransicionar,
   transicionesDisponibles,
+  requiereEstimacion,
+  estimacionBloqueaInicio,
 } from "@/lib/ticketStateMachine";
 
 const CREADOR  = "user-creador";
@@ -118,6 +120,34 @@ describe("puedeTransicionar", () => {
 
     it("desde cerrado no hay transiciones", () => {
       expect(transicionesDisponibles("cerrado")).toEqual([]);
+    });
+  });
+
+  describe("requiereEstimacion", () => {
+    it("solo la prioridad crítica requiere estimación de horas", () => {
+      expect(requiereEstimacion("critica")).toBe(true);
+      expect(requiereEstimacion("alta")).toBe(false);
+      expect(requiereEstimacion("media")).toBe(false);
+      expect(requiereEstimacion("baja")).toBe(false);
+    });
+  });
+
+  describe("estimacionBloqueaInicio", () => {
+    it("bloquea el inicio de un ticket crítico si la estimación no está aceptada", () => {
+      expect(estimacionBloqueaInicio("critica", "no_requerida")).toBe(true);
+      expect(estimacionBloqueaInicio("critica", "pendiente")).toBe(true);
+      expect(estimacionBloqueaInicio("critica", "en_revision")).toBe(true);
+      expect(estimacionBloqueaInicio("critica", "rechazada")).toBe(true);
+    });
+
+    it("no bloquea un ticket crítico una vez aceptada la estimación", () => {
+      expect(estimacionBloqueaInicio("critica", "aceptada")).toBe(false);
+    });
+
+    it("no bloquea tickets que no son críticos, sin importar el estado de estimación", () => {
+      expect(estimacionBloqueaInicio("alta", "pendiente")).toBe(false);
+      expect(estimacionBloqueaInicio("media", "no_requerida")).toBe(false);
+      expect(estimacionBloqueaInicio("baja", "no_requerida")).toBe(false);
     });
   });
 });

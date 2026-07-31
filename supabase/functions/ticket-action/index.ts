@@ -173,6 +173,55 @@ function buildEstadoHtml(titulo: string, nuevoEstado: string, logoUrl: string): 
   return layout("Actualización de Ticket", content, logoUrl);
 }
 
+function buildEstimacionPropuestaHtml(titulo: string, horas: number, logoUrl: string): string {
+  const content = `
+    <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:15px;color:#1a3461;font-weight:700">
+      Estimación de horas propuesta
+    </p>
+    <p style="margin:0 0 4px;font-family:Arial,sans-serif;font-size:14px;line-height:1.8;color:#334155">
+      El asignado propuso una estimación de horas para este ticket crítico. Debes revisarla y aceptarla o rechazarla
+      antes de que se pueda iniciar el progreso.
+    </p>
+    ${infoCard("#00b8d9",
+      fieldRow("Ticket", `<span style="font-size:15px">${titulo}</span>`) +
+      fieldRow("Horas estimadas", `<span style="font-size:15px">${horas}</span>`)
+    )}
+    ${ctaBtn("Revisar estimación")}`;
+  return layout("Estimación de Horas", content, logoUrl);
+}
+
+function buildEstimacionAceptadaHtml(titulo: string, horas: number, logoUrl: string): string {
+  const content = `
+    <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:15px;color:#1a3461;font-weight:700">
+      Estimación de horas aceptada
+    </p>
+    <p style="margin:0 0 4px;font-family:Arial,sans-serif;font-size:14px;line-height:1.8;color:#334155">
+      El creador aceptó tu estimación. Ya puedes iniciar el progreso del ticket.
+    </p>
+    ${infoCard("#15803d",
+      fieldRow("Ticket", `<span style="font-size:15px">${titulo}</span>`) +
+      fieldRow("Horas estimadas", `<span style="font-size:15px">${horas}</span>`)
+    )}
+    ${ctaBtn("Iniciar progreso")}`;
+  return layout("Estimación de Horas", content, logoUrl);
+}
+
+function buildEstimacionRechazadaHtml(titulo: string, horas: number, comentario: string, logoUrl: string): string {
+  const content = `
+    <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:15px;color:#1a3461;font-weight:700">
+      Estimación de horas rechazada
+    </p>
+    <p style="margin:0 0 4px;font-family:Arial,sans-serif;font-size:14px;line-height:1.8;color:#334155">
+      El creador rechazó tu estimación de ${horas} horas. Ingresa al portal para proponer una nueva.
+    </p>
+    ${infoCard("#dc2626",
+      fieldRow("Ticket", `<span style="font-size:15px">${titulo}</span>`) +
+      fieldRow("Motivo del rechazo", `<span style="font-size:14px">${comentario.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>`)
+    )}
+    ${ctaBtn("Proponer nueva estimación")}`;
+  return layout("Estimación de Horas", content, logoUrl);
+}
+
 function buildComentarioHtml(titulo: string, texto: string, logoUrl: string): string {
   const content = `
     <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:15px;color:#1a3461;font-weight:700">
@@ -285,6 +334,7 @@ serve(async (req) => {
         proyecto_id,
         creador_id:  user.id,
         asignado_id: asignado_id ?? null,
+        estimacion_estado: prioridad === "critica" ? "pendiente" : "no_requerida",
       }).select().single();
       if (error) throw error;
 
@@ -323,6 +373,10 @@ serve(async (req) => {
       );
       if (!resultado.permitido) return fail(resultado.razon ?? "Transición no permitida.", 403);
 
+      if (nuevo_estado === "en_progreso" && ticket.prioridad === "critica" && ticket.estimacion_estado !== "aceptada") {
+        return fail("Debes tener una estimación de horas aceptada por el creador antes de iniciar el progreso.", 403);
+      }
+
       const ahora = new Date().toISOString();
       const updates: Record<string, unknown> = { estado: nuevo_estado, updated_at: ahora };
       if (nuevo_estado === "resuelto") updates.resolved_at = ahora;
@@ -349,6 +403,107 @@ serve(async (req) => {
         `[VisionBI] Ticket actualizado: ${ticket.titulo}`,
         buildEstadoHtml(ticket.titulo, nuevo_estado, logoUrl),
       );
+
+      return ok({ success: true, ticket: updated });
+    }
+
+    // ── SET-ESTIMACION ────────────────────────────────────────────────────────
+    if (action === "set-estimacion") {
+      const { ticket_id, horas } = body;
+      if (!ticket_id || horas === undefined || horas === null) return fail("ticket_id y horas son requeridos.");
+      const horasNum = Number(horas);
+      if (!Number.isFinite(horasNum) || horasNum <= 0) return fail("Las horas deben ser un número mayor a 0.");
+
+      const { data: ticket, error: fetchErr } = await admin
+        .from("tickets").select("*").eq("id", ticket_id).single();
+      if (fetchErr || !ticket) return fail("Ticket no encontrado.", 404);
+
+      if (ticket.prioridad !== "critica") return fail("Este ticket no requiere estimación de horas.", 403);
+      if (!ticket.asignado_id || user.id !== ticket.asignado_id)
+        return fail("Solo el usuario asignado puede proponer una estimación.", 403);
+      if (!["pendiente", "rechazada"].includes(ticket.estimacion_estado))
+        return fail("La estimación de horas ya fue enviada para este ticket.", 403);
+
+      const { data: updated, error: updErr } = await admin
+        .from("tickets")
+        .update({
+          estimacion_horas: horasNum,
+          estimacion_estado: "en_revision",
+          estimacion_comentario_rechazo: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", ticket_id).select().single();
+      if (updErr) throw updErr;
+
+      await admin.from("ticket_actividad").insert({
+        ticket_id,
+        usuario_id: user.id,
+        tipo:       "estimacion",
+        contenido:  { accion: "propuesta", horas: horasNum },
+      });
+
+      await notifyAndEmail(
+        admin, [ticket.creador_id], user.id,
+        "ticket_estimacion", "Estimación de horas propuesta", `Se propusieron ${horasNum}h para: ${ticket.titulo}`,
+        { ticket_id },
+        `[VisionBI] Estimación de horas propuesta: ${ticket.titulo}`,
+        buildEstimacionPropuestaHtml(ticket.titulo, horasNum, logoUrl),
+      );
+
+      return ok({ success: true, ticket: updated });
+    }
+
+    // ── APPROVE-ESTIMACION ────────────────────────────────────────────────────
+    if (action === "approve-estimacion") {
+      const { ticket_id, aprobado, comentario } = body;
+      if (!ticket_id || typeof aprobado !== "boolean") return fail("ticket_id y aprobado son requeridos.");
+      if (!aprobado && !comentario?.trim()) return fail("Debes indicar un motivo de rechazo.");
+
+      const { data: ticket, error: fetchErr } = await admin
+        .from("tickets").select("*").eq("id", ticket_id).single();
+      if (fetchErr || !ticket) return fail("Ticket no encontrado.", 404);
+
+      if (user.id !== ticket.creador_id) return fail("Solo el creador del ticket puede aceptar o rechazar la estimación.", 403);
+      if (ticket.estimacion_estado !== "en_revision") return fail("No hay una estimación pendiente de revisión.", 403);
+
+      const updates: Record<string, unknown> = {
+        estimacion_estado: aprobado ? "aceptada" : "rechazada",
+        estimacion_comentario_rechazo: aprobado ? null : comentario.trim(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: updated, error: updErr } = await admin
+        .from("tickets").update(updates).eq("id", ticket_id).select().single();
+      if (updErr) throw updErr;
+
+      await admin.from("ticket_actividad").insert({
+        ticket_id,
+        usuario_id: user.id,
+        tipo:       "estimacion",
+        contenido:  aprobado
+          ? { accion: "aceptada", horas: ticket.estimacion_horas }
+          : { accion: "rechazada", horas: ticket.estimacion_horas, comentario: comentario.trim() },
+      });
+
+      if (ticket.asignado_id) {
+        if (aprobado) {
+          await notifyAndEmail(
+            admin, [ticket.asignado_id], user.id,
+            "ticket_estimacion", "Estimación de horas aceptada", `Tu estimación de ${ticket.estimacion_horas}h fue aceptada: ${ticket.titulo}`,
+            { ticket_id },
+            `[VisionBI] Estimación de horas aceptada: ${ticket.titulo}`,
+            buildEstimacionAceptadaHtml(ticket.titulo, ticket.estimacion_horas, logoUrl),
+          );
+        } else {
+          await notifyAndEmail(
+            admin, [ticket.asignado_id], user.id,
+            "ticket_estimacion", "Estimación de horas rechazada", `Tu estimación fue rechazada: ${ticket.titulo}`,
+            { ticket_id },
+            `[VisionBI] Estimación de horas rechazada: ${ticket.titulo}`,
+            buildEstimacionRechazadaHtml(ticket.titulo, ticket.estimacion_horas, comentario.trim(), logoUrl),
+          );
+        }
+      }
 
       return ok({ success: true, ticket: updated });
     }
